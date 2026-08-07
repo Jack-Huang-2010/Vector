@@ -62,7 +62,7 @@ Unlike target applications which request access, the daemon actively pushes its 
 ### 4. Native Socket IPC
 For native components that operate outside the Java Binder context, the daemon provisions two distinct types of UNIX domain sockets.
 
-* Command-Line Interface: The `CliSocketServer` exposes a filesystem-based socket at `/data/adb/lspd/.cli_sock`. The CLI client authenticates using a compiled-in UUID token and communicates using structured JSON. For live log streaming, the daemon attaches the log file's raw `FileDescriptor` to the socket reply payload, allowing the client to read directly from the OS-level stream buffer.
+* Command-Line Interface: The `CliSocketServer` binds an abstract UNIX domain socket under a per-boot random name, which the daemon publishes to a root-only file (`/data/adb/lspd/.sock`) for the CLI client to read. This keeps `/proc/net/unix` free of any constant, framework-specific string that an integrity scanner could match. The client authenticates using a compiled-in UUID token and communicates using structured JSON. For live log streaming, the daemon attaches the log file's raw `FileDescriptor` to the socket reply payload, allowing the client to read directly from the OS-level stream buffer.
 * Dex2Oat Wrapper: The `Dex2OatServer` listens on an abstract UNIX domain socket. To prevent conflicts and detection, the exact name of this abstract socket is randomized during module installation. The C++ `dex2oat` wrapper connects to this socket to receive necessary file descriptors via `SCM_RIGHTS`.
 
 ## Native Environment Subsystems

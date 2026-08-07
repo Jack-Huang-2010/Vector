@@ -25,6 +25,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.PosixFilePermissions
+import java.security.SecureRandom
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -69,7 +70,6 @@ object FileSystem {
   val logDirPath: Path = basePath.resolve("log")
   val oldLogDirPath: Path = basePath.resolve("log.old")
   val modulePath: Path = basePath.resolve("modules")
-  val socketPath: Path = basePath.resolve(".cli_sock")
   val daemonApkPath: Path = Paths.get(System.getProperty("java.class.path", ""))
   val managerApkPath: Path = daemonApkPath.parent.resolve("manager.apk")
   val configDirPath: Path = basePath.resolve("config")
@@ -79,6 +79,26 @@ object FileSystem {
 
   private val formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME.withZone(ZoneId.systemDefault())
   private val lockPath: Path = basePath.resolve("lock")
+
+  /**
+   * The root-only file that publishes the name of the abstract socket the CLI reaches the daemon
+   * on.
+   *
+   * The CLI endpoint used to be a fixed filesystem socket at /data/adb/lspd/.cli_sock. The kernel
+   * copies a socket's bind address verbatim into /proc/net/unix, and that table is readable by any
+   * process sharing the (on Android, global) network namespace, regardless of the 0700 directory
+   * guarding the file on disk. So the constant path string was a stable, version-independent
+   * signature for the framework (#891): a scanner only had to grep /proc/net/unix for it, no
+   * privilege required, because the leak is the kernel's own bookkeeping rather than any surface
+   * this daemon controls.
+   *
+   * The socket is now bound in the abstract namespace under a per-boot random name, which shows up
+   * as @<name> with nothing constant to match. The daemon and the CLI are separate processes, so
+   * the name cannot live only in this object's memory the way the compile-time constant did; the
+   * daemon writes it to this file — inside the same 0700 root-owned directory, and never itself a
+   * socket, so it stays out of /proc/net/unix — for the CLI to read back.
+   */
+  private val socketNamePath: Path = basePath.resolve(".sock")
   private var fileLock: FileLock? = null
   private var lockChannel: FileChannel? = null
 
@@ -92,6 +112,11 @@ object FileSystem {
         .onFailure { Log.e(TAG, "Failed to initialize directories", it) }
   }
 
+  /**
+   * Deploys the CLI helper and mints the name for the abstract socket the daemon is about to bind,
+   * publishing it to [socketNamePath] so the separate CLI process can find it. Returns the fresh
+   * name. Called once per daemon start, so each boot advertises a new name.
+   */
   fun setupCli(): String {
     val cliSource = daemonApkPath.parent.resolve("cli").toFile()
     val cliDest = basePath.resolve("cli").toFile()
@@ -103,14 +128,30 @@ object FileSystem {
           .onFailure { Log.e(TAG, "Failed to deploy CLI script", it) }
     }
 
-    val cliSocket: String = socketPath.toString()
-    val socketFile = File(cliSocket)
-    if (socketFile.exists()) {
-      Log.d(TAG, "Existing $cliSocket deleted")
-      socketFile.delete()
-    }
+    val socketName = generateSocketName()
+    runCatching {
+          Files.write(socketNamePath, socketName.toByteArray())
+          Os.chmod(socketNamePath.toString(), "600".toInt(8))
+        }
+        .onFailure { Log.e(TAG, "Failed to publish the CLI socket name", it) }
+    return socketName
+  }
 
-    return cliSocket
+  /**
+   * The abstract socket name the running daemon published, or null when no daemon has written one
+   * (so the CLI can say "not running" rather than fail to connect to a stale name). Read fresh at
+   * connect time so a daemon restart, which rewrites the file, is picked up without coordination.
+   */
+  fun readSocketName(): String? =
+      runCatching { Files.readAllBytes(socketNamePath).toString(Charsets.UTF_8).trim() }
+          .getOrNull()
+          ?.takeIf { it.isNotEmpty() }
+
+  /** 128 random bits as hex: unguessable, and no constant a scanner can key on. */
+  private fun generateSocketName(): String {
+    val bytes = ByteArray(16)
+    SecureRandom().nextBytes(bytes)
+    return bytes.joinToString("") { "%02x".format(it.toInt() and 0xff) }
   }
 
   /** Tries to lock the daemon lockfile. Returns false if another daemon is running. */

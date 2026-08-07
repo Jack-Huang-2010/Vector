@@ -7,7 +7,6 @@ import android.system.Os
 import android.util.Log
 import java.io.DataInputStream
 import java.io.DataOutputStream
-import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
 import kotlinx.coroutines.launch
@@ -29,16 +28,17 @@ object CliSocketServer {
       // Keep these references outside the loop to prevent GC from closing them
       var rootSocket: LocalSocket? = null
       var server: LocalServerSocket? = null
-      var socketFile: File? = null
 
       try {
-        val cliSocketPath: String = FileSystem.setupCli()
-        socketFile = File(cliSocketPath)
+        val socketName: String = FileSystem.setupCli()
 
         // Create a standard LocalSocket
         rootSocket = LocalSocket()
-        // Bind it to the filesystem path
-        val address = LocalSocketAddress(cliSocketPath, LocalSocketAddress.Namespace.FILESYSTEM)
+        // Bind it in the abstract namespace: the name shows up in /proc/net/unix as @<name> with
+        // no filesystem path, and the daemon mints a fresh random name every boot, so there is no
+        // constant string left for an integrity scanner to fingerprint (#891). The bind carries no
+        // file, so nothing has to be unlinked when the socket closes either.
+        val address = LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT)
         rootSocket.bind(address)
 
         // LocalServerSocket(FileDescriptor) requires the FD to already be listening.
@@ -46,7 +46,7 @@ object CliSocketServer {
         // Wrap the underlying FileDescriptor into a ServerSocket
         server = LocalServerSocket(rootSocket.fileDescriptor)
 
-        Log.d(TAG, "CLI server started at $cliSocketPath")
+        Log.d(TAG, "CLI server started")
 
         while (!Thread.currentThread().isInterrupted) {
           try {
@@ -61,13 +61,11 @@ object CliSocketServer {
         Log.e(TAG, "Fatal CLI Server error", e)
       } finally {
         try {
+          // Closing the bound fd drops the abstract socket; there is no file to unlink.
           server?.close()
           rootSocket?.close()
         } catch (ignored: Exception) {}
 
-        if (socketFile?.exists() == true) {
-          socketFile.delete()
-        }
         isRunning = false
         Log.d(TAG, "CLI server stopped")
       }

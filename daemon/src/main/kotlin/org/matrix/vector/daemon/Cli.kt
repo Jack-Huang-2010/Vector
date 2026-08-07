@@ -43,14 +43,14 @@ object VectorIPC {
   fun transmit(request: CliRequest): CliResponse {
     val socket = LocalSocket()
     return try {
-      val cliSocket = FileSystem.socketPath.toString()
-      val socketFile = java.io.File(cliSocket)
-
-      if (!socketFile.exists()) {
-        System.err.println("Error: Socket file not found at $cliSocket")
-        System.err.println("Current UID: ${android.os.Process.myUid()}")
-      }
-      socket.connect(LocalSocketAddress(cliSocket, LocalSocketAddress.Namespace.FILESYSTEM))
+      // The daemon binds an abstract socket under a per-boot random name and publishes that name
+      // through FileSystem; absent it, no daemon is running to talk to.
+      val socketName =
+          FileSystem.readSocketName()
+              ?: return CliResponse(
+                  success = false,
+                  error = "Vector daemon is not running (no CLI socket published).")
+      socket.connect(LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT))
 
       val output = DataOutputStream(socket.outputStream)
       val input = DataInputStream(socket.inputStream)
