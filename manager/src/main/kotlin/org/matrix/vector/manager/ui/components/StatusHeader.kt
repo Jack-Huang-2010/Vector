@@ -427,8 +427,10 @@ private fun StatusIndicator(
                 modifier =
                     Modifier.size(26.dp).graphicsLayer {
                         alpha = 1f - morph
-                        // Away rather than out: the tick shrinks and turns as the gear arrives
+                        // Away rather than out: the tick shrinks and twists as the gear arrives
                         // over it, so the two read as one object changing rather than two swapped.
+                        // The twist is the departing tick's alone, deliberately — a turn of the
+                        // *gear* means a coin came up heads, and nothing else may spend one.
                         val leaving = lerp(1f, 0.6f, morph)
                         scaleX = leaving
                         scaleY = leaving
@@ -447,9 +449,12 @@ private fun StatusIndicator(
                         val arriving = lerp(0.6f, 1f, morph)
                         scaleX = arriving
                         scaleY = arriving
-                        // The arrival angle folds into the wheel's own, so a gear that starts
-                        // turning immediately turns on from where it landed.
-                        rotationZ = spin.value + MORPH_TURN * (1f - morph)
+                        // `spin` and nothing else. The wheel arrives and leaves at exactly the
+                        // angle it is resting at, so every degree it ever turns through was asked
+                        // for by a coin — which is the whole point of tossing one. It used to pick
+                        // up the tick's twist on the way in and give it back on the way out, and
+                        // that made the gear turn on every hint whatever the coins said.
+                        rotationZ = spin.value
                     },
             )
         }
@@ -489,7 +494,12 @@ private const val FULL_TURN = 360f
 /** The tick-to-gear cross-dissolve, timed like the header's colour and corner transitions. */
 private const val MORPH_MS = 420
 
-/** How far each glyph turns while trading places, in degrees. Enough to read as a twist. */
+/**
+ * How far the *tick* turns as it hands over, in degrees. Enough to read as a twist.
+ *
+ * Not applied to the gear. See the two `graphicsLayer` blocks: the gear's only source of rotation
+ * is the coin, so a hint whose five tosses all come up tails shows a wheel that never moves.
+ */
 private const val MORPH_TURN = 60f
 
 /** The badge's fill against the header, at rest and while it is asking to be pressed. */
