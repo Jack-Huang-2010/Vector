@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="Binder Test Module">
+        <meta-data android:name="xposedmodule" android:value="true" />
+        <meta-data android:name="xposeddescription" android:value="Minimal module for testing binder delivery" />
+        <meta-data android:name="xposedminversion" android:value="93" />
+        <service
+            android:name="org.matrix.bindertest.KeepAliveService"
+            android:exported="true"
+            android:process=":keep" />
+        <provider
+            android:name="org.matrix.bindertest.KeepAliveProvider"
+            android:authorities="org.matrix.bindertest.KeepAlive"
+            android:exported="true"
+            android:process=":keep" />
+        <provider
+            android:name="io.github.libxposed.service.XposedProvider"
+            android:authorities="org.matrix.bindertest.XposedService"
+            android:exported="true" />
+    </application>
+</manifest>
