@@ -101,8 +101,18 @@ class ModuleAppService(private val loadedModule: LoadedModule) : IXposedService.
     runCatching {
           val userId = uid / PER_USER_RANGE
           val authority = name + AUTHORITY_SUFFIX
+          // The tag argument arrived in Q, replacing the three-argument form rather than
+          // overloading it, so each side of that line is a NoSuchMethodError on the other. The
+          // branch lived in the Java daemon's ActivityManagerService and went with it in #597,
+          // which means no modern module has been handed its service on 8.1 or 9 since —
+          // swallowed, because the error lands in the runCatching here and reads as an ordinary
+          // failed delivery.
           val provider =
-              activityManager?.getContentProviderExternal(authority, userId, null, null)?.provider
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                activityManager?.getContentProviderExternal(authority, userId, null, null)
+              } else {
+                activityManager?.getContentProviderExternal(authority, userId, null)
+              }?.provider
 
           if (provider == null) {
             Log.d(TAG, "No service provider for $name")
