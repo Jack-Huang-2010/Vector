@@ -1,0 +1,9 @@
+id=org.matrix.vxmodule
+name=XP Conformance
+version=1.0
+versionCode=1
+author=vector-harness
+description=libxposed API 102 conformance harness
+minApiVersion=102
+targetApiVersion=102
+staticScope=false

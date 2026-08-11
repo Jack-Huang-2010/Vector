@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The layout the ResHook case replaces. The tag is the first half of the payload: after a
+    replacement the inflated root must carry the module's tag instead of this one, which is
+    observable without reading a single id out of either package's resource table.
+
+    The id is the other half. The module's copy declares the same name, so the reference inside it
+    has to be translated to the number this package gave it here; nothing else in this file is
+    inflated once the replacement is in place.
+
+    This is the only place the target declares an id, and that is load-bearing: aapt2 numbers the
+    entries of a type in name order, so probe_root is entry 0 here while the module has a name
+    ahead of it. Adding an id that sorts before probe_root would give both packages the same number
+    for it, and the case would report SETUP rather than measure a rewrite it can no longer see. The
+    attribute the replacement carries is declared in values/attrs.xml for the same reason; it is
+    deliberately not used here, since this document is the one being replaced.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/probe_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:tag="ORIGINAL"
+    android:text="original" />

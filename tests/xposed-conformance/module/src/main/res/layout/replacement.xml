@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Stands in for the target's layout/probe.xml once the resource replacement is installed.
+
+    Three things in here are payload, and each is read by a different part of the framework.
+
+    android:tag needs no rewriting at all; it is what says whose document was inflated.
+
+    The two id references are the value half of the rewrite. Both are compiled as this package's own
+    ids, so the framework has to translate them before the app inflates the document. probe_root is
+    the one the case reads back: the target declares that name too, so it has to come back as the
+    target's number. module_only is here for the numbering below, and the fake 0x7e id it turns into
+    - it exists in no other package - is not asserted anywhere: whether an unresolvable reference
+    survives the inflater's TypedArray is a question about the platform, not about the rewrite.
+
+    app:vxProbe is the attribute-name half, which is a different code path in a different language:
+    what has to be rewritten is not the value but the resource id the attribute is looked up by, in
+    the document's own attribute name map. Only an attribute belonging to this package reaches it -
+    the android: ones are 0x0101xxxx and the native side skips them - so this attribute is the only
+    thing in either APK that exercises that half at all.
+
+    Both names matter, and not for where they sit in this file: aapt2 numbers the entries of a type
+    in name order, so what keeps this package from numbering probe_root and vxProbe the way the
+    target does is that module_only sorts ahead of probe_root and vxModuleOnly (values/attrs.xml)
+    sorts ahead of vxProbe. Rename either to something sorting after and the two packages agree,
+    the rewrite stops being observable, and the case reports SETUP instead of a green row.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/probe_root"
+    android:labelFor="@+id/module_only"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:tag="REPLACED"
+    android:text="replaced"
+    app:vxProbe="probe" />

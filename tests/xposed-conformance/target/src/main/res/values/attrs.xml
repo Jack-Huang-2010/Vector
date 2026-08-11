@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The host side of the attribute half of the resource rewrite.
+
+    The module's replacement layout carries an attribute of its own, compiled as the module's attr
+    id. Before the app parses that document the framework has to rename it to this package's id,
+    and the only thing it has to go on is the name: XResources.translateAttrId looks the name up
+    with getIdentifier(name, "attr", <this package>). Without this declaration the lookup answers 0,
+    the framework writes 0 into the document, and the case cannot tell that from a rewrite that
+    never ran.
+
+    Nothing in this APK uses the attribute. Declaring it is the whole point.
+-->
+<resources>
+    <attr name="vxProbe" format="string" />
+</resources>

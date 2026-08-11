@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    vxProbe is the attribute the replacement layout carries, and the target declares it too, so the
+    framework's rewrite has a host id to rename it to.
+
+    vxModuleOnly is declared for one reason: to keep vxProbe off entry 0. aapt2 numbers the entries
+    of a type in name order, and with a single attr each both packages would call vxProbe
+    0x7f??0000 - an untranslated attribute name would then read exactly like a translated one and
+    the assertion could not fail. A name sorting ahead of vxProbe here is what keeps the two numbers
+    apart. The case checks that they are still apart and reports SETUP rather than passing if they
+    ever coincide again, so renaming this to something sorting after vxProbe costs the row, not its
+    honesty.
+-->
+<resources>
+    <attr name="vxModuleOnly" format="string" />
+    <attr name="vxProbe" format="string" />
+</resources>

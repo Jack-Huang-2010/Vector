@@ -1,0 +1,7 @@
+build/
+.cxx/
+.gradle/
+local.properties
+*.iml
+.idea/
+run-results.txt

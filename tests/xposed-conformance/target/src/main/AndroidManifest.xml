@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="XP Conformance Target"
+        android:allowBackup="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            Every case runs in this process and nowhere else, so a case that aborts the runtime
+            takes down only the suite process. The driver notices the missing result, records
+            CRASH, and the next broadcast starts the process again.
+        -->
+        <receiver
+            android:name=".RunReceiver"
+            android:process=":suite"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.matrix.vxtarget.RUN" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
