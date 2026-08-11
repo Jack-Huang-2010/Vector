@@ -865,17 +865,16 @@ VECTOR_DEF_NATIVE_METHOD(jobjectArray, HookBridge, callbackSnapshot, jclass call
  * boot. Resolving them through the same map the rest of the framework uses is what makes the guard
  * hold in both configurations.
  *
- * The four entries are the whole legacy surface the obfuscation table covers: the package itself,
- * AndroidAppHelper, and the XResources / XModuleResources family. Guarding only the package would
- * leave the legacy resource API reachable.
+ * The one entry is the one package the spec names. The obfuscation table also covers
+ * AndroidAppHelper and the XResources / XModuleResources family, and guarding those too was the
+ * wider reading of the same sentence - but the interface says "legacy {@code de.robv.android.xposed}
+ * APIs" and names nothing else, and API 102 offers no resource API of its own, so the wider reading
+ * left a module targeting it with no way to touch resources at all.
  */
 VECTOR_DEF_NATIVE_METHOD(jobjectArray, HookBridge, legacyApiPrefixes) {
     // In the dotted form the obfuscation map is served in - the same form loadClass receives.
     static constexpr const char *kLegacyKeys[] = {
         "de.robv.android.xposed.",
-        "android.app.AndroidApp",
-        "android.content.res.XRes",
-        "android.content.res.XModule",
     };
 
     const auto count = static_cast<jsize>(ArraySize(kLegacyKeys));
