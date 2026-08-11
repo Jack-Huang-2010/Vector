@@ -9,6 +9,7 @@ import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import org.matrix.vector.impl.di.VectorBootstrap
 import org.matrix.vector.nativebridge.HookBridge
+import org.matrix.vector.util.Utils
 
 /**
  * Base implementation of the Invoker system. Handles the resolution of [Invoker.Type] to determine
@@ -26,9 +27,9 @@ internal abstract class BaseInvoker<T : Invoker<T, U>, U : Executable>(
     // An invoker names one executable for its whole life, and each of these would otherwise be
     // rebuilt per call: getParameterTypes clones its array every time it is asked, and the shorty
     // is derived from that array.
-    private val parameterTypes: Array<Class<*>> = executable.parameterTypes
+    protected val parameterTypes: Array<Class<*>> = executable.parameterTypes
     private val shorty: CharArray = VectorInvocation.shortyOf(executable, parameterTypes)
-    private val declaringClass: Class<*> = executable.declaringClass
+    protected val declaringClass: Class<*> = executable.declaringClass
     private val isStatic: Boolean = Modifier.isStatic(executable.modifiers)
 
     @Suppress("UNCHECKED_CAST")
@@ -38,17 +39,22 @@ internal abstract class BaseInvoker<T : Invoker<T, U>, U : Executable>(
     }
 
     /**
-     * Resolves the current [type] and runs the executable, non-virtually when [nonVirtual].
+     * Resolves [type] and runs the executable, non-virtually when [nonVirtual].
      *
      * The receiver and the arguments are checked before the chain is entered, because Method#invoke
      * reports its own refusals unwrapped and reserves InvocationTargetException for what the call
      * threw - and everything thrown inside the chain is what the call threw. [onReceiver] reports
      * the receiver each dispatch actually ran against, which a hooker may have redirected.
+     *
+     * [type] defaults to this invoker's own, and is a parameter for the one caller that has to
+     * decide it from outside: a virtual invocation that resolved to an override runs the override's
+     * chain, under the type asked of the invoker the module actually holds.
      */
     protected fun proceedInvocation(
         thisObject: Any?,
         args: Array<out Any?>,
         nonVirtual: Boolean,
+        type: Invoker.Type = this.type,
         onReceiver: (Any?) -> Unit = {},
     ): Any? {
         val receiver = VectorInvocation.checkReceiver(executable, isStatic, thisObject)
@@ -127,11 +133,84 @@ internal abstract class BaseInvoker<T : Invoker<T, U>, U : Executable>(
 internal class VectorMethodInvoker(method: Method) :
     BaseInvoker<VectorMethodInvoker, Method>(method) {
 
+    /**
+     * One resolution, kept whole so that no reader can pair one call's class with another's target.
+     */
+    private class Resolution(val receiverClass: Class<*>, val target: VectorMethodInvoker)
+
+    // Whether any receiver can move this call elsewhere at all. A property of the executable alone,
+    // so it is settled once and short-circuits every call on a method nothing can override.
+    private val overridable: Boolean = VectorInvocation.canBeOverridden(method)
+
+    // What the executable alone cannot settle is which override a call reaches, because that
+    // depends on the receiver's class - so that is what this is keyed by. One entry rather than a
+    // map: a call site sees one receiver class almost always, which is what makes an inline cache
+    // worth having, and a map would pin every class it ever saw - and through each, its whole
+    // loader - for as long as the module holds the invoker.
+    @Volatile private var resolved: Resolution? = null
+
+    /**
+     * `invoke` is documented "@see Method#invoke", and Method#invoke dispatches virtually: a Method
+     * taken from a superclass reaches the receiver's override. That does not happen by itself here,
+     * because a hooked executable is reached through lsplant's backup, which is private and so
+     * dispatched directly - the override has to be resolved and entered explicitly.
+     *
+     * The override is a different executable carrying a chain of its own, and Method#invoke would
+     * run it hooks and all, so what is entered is that chain and not this one's. Its invoker is
+     * asked to run it directly rather than through this entry point, which is what makes the
+     * redirection exactly one hop deep whatever the hierarchy looks like.
+     */
     override fun invokeWith(thisObject: Any?, args: Array<Any?>): Any? =
-        proceedInvocation(thisObject, args, nonVirtual = false)
+        virtualTarget(thisObject).runChain(thisObject, args, type)
 
     override fun invokeSpecialWith(thisObject: Any?, args: Array<Any?>): Any? =
         proceedInvocation(thisObject, args, nonVirtual = true)
+
+    /** Runs this invoker's own chain under a [type] its caller owns, resolving nothing further. */
+    private fun runChain(thisObject: Any?, args: Array<Any?>, type: Invoker.Type): Any? =
+        proceedInvocation(thisObject, args, nonVirtual = false, type = type)
+
+    /**
+     * The invoker whose executable this call reaches, which is this one unless the receiver's class
+     * overrides.
+     *
+     * Type.Origin is answered with this invoker and never resolves, which is the one place the type
+     * decides the dispatch. "Invokes the original executable, skipping all hooks" reads most simply
+     * as the executable this invoker names, and the alternative breaks the idiom the whole type
+     * exists for: a hooker on `Base.name` asking for the original with an overriding receiver in
+     * hand would reach `Derived.name`, whose body calls `super.name()`, which is the hooked method
+     * again - the hook would call itself until the stack ran out. Skipping all hooks cannot mean
+     * entering one.
+     *
+     * A Chain type carries no such hazard, because the chain it enters is the override's own and
+     * the override's `super` call reaches this executable's body once, not its hook.
+     */
+    private fun virtualTarget(thisObject: Any?): VectorMethodInvoker {
+        if (!overridable || thisObject == null || type is Invoker.Type.Origin) return this
+        val receiverClass = thisObject.javaClass
+        // The commonest receiver of all, and the one a walk could say nothing about.
+        if (receiverClass === declaringClass) return this
+
+        val cached = resolved
+        if (cached != null && cached.receiverClass === receiverClass) return cached.target
+
+        // Resolution reads declared members of classes this call would otherwise never touch, so a
+        // signature naming a class that is not there raises where the invocation would have
+        // succeeded. Only that is caught: anything else is a bug in the walk and has to surface.
+        // The answer is not cached either, because it is the wrong one - on a hooked executable it
+        // reinstates the very defect this resolves, so a later call has to be free to try again.
+        val override =
+            try {
+                VectorInvocation.virtualTargetOf(executable, parameterTypes, receiverClass)
+            } catch (e: LinkageError) {
+                Utils.logW("Cannot resolve the override of $executable for $receiverClass", e)
+                return this
+            }
+
+        val target = override?.let(::VectorMethodInvoker) ?: this
+        resolved = Resolution(receiverClass, target)
+        return target
+    }
 }
 
 /**

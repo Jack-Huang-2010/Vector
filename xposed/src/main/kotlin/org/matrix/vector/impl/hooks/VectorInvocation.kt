@@ -24,6 +24,12 @@ import org.matrix.vector.nativebridge.HookBridge
  * The messages are ART's own, from `art/runtime/reflection.cc`, so a module that reads one - or a
  * conformance suite that asserts on it - gets the same text here as from Method#invoke.
  * `Class#getTypeName` is the Java side of ART's PrettyDescriptor: dotted, and `int[]` for an array.
+ *
+ * The receiver decides one more thing reflection settles before it calls anything, and that is
+ * *which* method it calls: Method#invoke dispatches virtually, so a Method taken from a superclass
+ * reaches the receiver's override. A caller that already holds the target - which is what every
+ * dispatch through a hook backup is - reaches no override on its own, so the answer is computed
+ * here instead.
  */
 object VectorInvocation {
 
@@ -68,6 +74,132 @@ object VectorInvocation {
             )
         }
         return thisObject
+    }
+
+    /**
+     * Whether any class could put another body in front of [method] for some receiver.
+     *
+     * A static or private method has no vtable slot to replace - the runtime dispatches both
+     * directly - and a final method, or any method of a final class, has one that nothing is
+     * allowed to replace. None of that depends on the receiver, so an invoker settles it once
+     * instead of walking a hierarchy per call.
+     */
+    fun canBeOverridden(method: Method): Boolean {
+        val modifiers = method.modifiers
+        if (Modifier.isStatic(modifiers) || Modifier.isPrivate(modifiers)) return false
+        if (Modifier.isFinal(modifiers)) return false
+        // An interface is never final, and a method declared by one is overridden by definition.
+        return !Modifier.isFinal(method.declaringClass.modifiers)
+    }
+
+    /**
+     * The declaration a virtual call on [receiverClass] enters, when that is not [method] itself.
+     *
+     * The runtime answers this out of the vtable, which Java cannot read, so the answer is rebuilt
+     * the way the vtable is: starting at the declaring class and coming down towards the receiver,
+     * each class's own declaration replacing the one it overrides. Coming down rather than up from
+     * the receiver is what makes overriding transitive, which it is - a package-private method may
+     * be overridden inside its own package by a declaration that widens it to public, and a
+     * subclass in another package then overrides that one, and so this one too, though it could
+     * never have overridden it directly.
+     *
+     * [parameterTypes] is the caller's copy of what `method.getParameterTypes()` returns, which is
+     * cloned on every call and does not change for the life of an invoker.
+     *
+     * Asking the same question again about the answer settles it: a second walk for the same
+     * receiver starts at the class the first one stopped in and covers exactly the classes it had
+     * already rejected, so it finds nothing. Dispatch resolves once and reaches a fixed point.
+     *
+     * @return the override, or null when [method] is what the call reaches. A receiver that is not
+     *   an instance of the declaring class answers null too: its own hierarchy says nothing about a
+     *   method it does not have, and the refusal is [checkReceiver]'s to report.
+     */
+    fun virtualTargetOf(
+        method: Method,
+        parameterTypes: Array<Class<*>>,
+        receiverClass: Class<*>,
+    ): Method? {
+        val declaringClass = method.declaringClass
+        if (!declaringClass.isAssignableFrom(receiverClass)) return null
+
+        // The receiver's superclasses down to the declaring class, most derived first. An interface
+        // is not on that chain, so a method declared by one ends the walk at Object instead, which
+        // finds the implementing class's declaration - what Method#invoke reaches for the shape that
+        // matters. It does not find a more specific default: where a sub-interface overrides a
+        // default and no class declares it, the walk answers nothing and the call reaches the
+        // declared interface's default. Resolving that needs a walk of the interface graph as well,
+        // and no caller has wanted one yet.
+        val classes = ArrayList<Class<*>>(4)
+        var clazz: Class<*>? = receiverClass
+        while (clazz != null && clazz !== declaringClass) {
+            classes.add(clazz)
+            clazz = clazz.superclass
+        }
+
+        var current = method
+        for (i in classes.size - 1 downTo 0) {
+            current = declaredOverrideIn(classes[i], current, parameterTypes) ?: current
+        }
+        return if (current === method) null else current
+    }
+
+    /** The declaration in [clazz] that takes [inherited]'s slot, or null when it has none. */
+    private fun declaredOverrideIn(
+        clazz: Class<*>,
+        inherited: Method,
+        parameterTypes: Array<Class<*>>,
+    ): Method? {
+        for (candidate in clazz.declaredMethods) {
+            // The name is tested first because it is the only test that resolves nothing: reading a
+            // return or parameter type of a method this class merely happens to declare would load
+            // classes on a path that has no business loading any.
+            if (candidate.name != inherited.name) continue
+            // The return type is part of what the runtime matches on, and has to be here too. A
+            // covariant override compiles to two methods - the narrow one, plus a synthetic bridge
+            // carrying the inherited signature - and it is the bridge that takes the slot. Entering
+            // the narrow one instead would skip whatever the bridge does and any hook on it.
+            if (candidate.returnType !== inherited.returnType) continue
+            if (candidate.parameterCount != parameterTypes.size) continue
+            if (!candidate.parameterTypes.contentEquals(parameterTypes)) continue
+
+            // No class can declare two methods agreeing on all three, so this one decides whether
+            // the class contributes an override or nothing at all - and a private or static
+            // declaration contributes nothing, because it is dispatched directly and leaves the
+            // inherited slot exactly where it was.
+            val modifiers = candidate.modifiers
+            if (Modifier.isStatic(modifiers) || Modifier.isPrivate(modifiers)) return null
+            return if (overrides(inherited, clazz)) candidate else null
+        }
+        return null
+    }
+
+    /**
+     * Whether a declaration in [subclass] may replace [inherited], which for anything but a
+     * package-private method it always may.
+     *
+     * A package-private method is overridden only from inside its own runtime package, and a
+     * runtime package is the package name together with the defining class loader: two loaders each
+     * defining a `com.example.Foo` define two packages, and a method in one overrides nothing in
+     * the other. Reading this rule as the name alone would silently redirect every package-private
+     * call whose receiver was loaded somewhere else - which, in a process hosting an app, a module
+     * and the framework at once, is not a rare shape.
+     */
+    private fun overrides(inherited: Method, subclass: Class<*>): Boolean {
+        val modifiers = inherited.modifiers
+        if (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)) return true
+        val owner = inherited.declaringClass
+        return owner.classLoader === subclass.classLoader &&
+            packageNameOf(owner) == packageNameOf(subclass)
+    }
+
+    /**
+     * The package a class belongs to, taken from its name because that is where the runtime takes
+     * it from - and because Class#getPackageName arrived in API 28, above what this supports.
+     */
+    private fun packageNameOf(clazz: Class<*>): String {
+        val name = clazz.name
+        val lastDot = name.lastIndexOf('.')
+        return if (lastDot < 0) "" else name.substring(0, lastDot)
     }
 
     /**
@@ -186,8 +318,15 @@ object VectorInvocation {
      * documented as Method#invoke without the access check and is handed an Executable of either
      * kind, so it needs what an invoker needs; it holds no invoker, so nothing here is cached.
      *
-     * A constructor is dispatched non-virtually because it is a direct method either way, and a
-     * method virtually because that is what the Method#invoke it is documented against does.
+     * A constructor is dispatched non-virtually because it is a direct method either way. A method
+     * asks for a virtual dispatch, and gets one while it carries no hook; once it does, it is
+     * reached through lsplant's backup, which is private and so dispatched directly, and an
+     * overriding receiver reaches this executable's body rather than its override. The modern
+     * invoker resolves the override for itself rather than rely on the dispatch - see
+     * [VectorMethodInvoker.invokeWith] - and this bridge deliberately does not: `invokeOriginalMethod`
+     * is what a legacy hooker calls to run the method it hooked, so the executable it named is the
+     * one it means, and resolving an override here would send a hooker's own super call back into
+     * its hook.
      *
      * IllegalAccessException is not among the outcomes: neither branch of the dispatch runs an
      * access check, which is the whole point of the legacy bridge's "access permissions are not
