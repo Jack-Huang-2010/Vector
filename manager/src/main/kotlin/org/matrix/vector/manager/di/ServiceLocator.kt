@@ -117,7 +117,7 @@ object ServiceLocator {
     val modules: ModuleRepository by lazy { ModuleRepository(daemon, appScope) }
 
     val apps: AppRepository by lazy {
-        AppRepository(daemon, context.packageManager, moduleDetection)
+        AppRepository(daemon, context.packageManager, moduleDetection, appScope)
     }
 
     /**
