@@ -43,6 +43,17 @@ import androidx.compose.ui.unit.dp
 /** The module's icon, and the slot it is drawn in whether or not it is selected. */
 private val ICON_SIZE = 48.dp
 
+/**
+ * The fixed width of the icon column (the icon plus the API badge under it).
+ *
+ * Deliberately wider than the icon: the badge reads "LSPosed 102" on a modern module and "Xposed
+ * 93" on a legacy one, and if the column wrapped its contents the text column to its right would
+ * start at a different x for every row — the names and descriptions would stop lining up. Fixing
+ * the column width wide enough for the widest badge (single-line, so a "LSPosed 102" fits) is what
+ * keeps the name/description edges shared across the list without the badge truncating.
+ */
+private val ICON_COLUMN_WIDTH = 66.dp
+
 /** Room for a version and its mark. Anything longer scrolls past instead of pushing. */
 private val VERSION_WIDTH = 104.dp
 
@@ -131,18 +142,28 @@ fun ModuleRow(
         // The icon is the selection handle. Double-tapping it is the host's chance to toggle without
         // leaving the list; a bare tap only reports state, since a one-tap toggle would fire whenever
         // a thumb brushed the list.
+        //
+        // The column is fixed at the icon's width so the API badge underneath it cannot widen it: a
+        // wide badge (e.g. "liblsposed 102") would otherwise push the text column right for that row
+        // alone, and the module names would no longer line up. The badge is laid out at its natural
+        // width inside the fixed box — if it is wider than the icon it overflows to the right but the
+        // text column keeps its fixed start, which is the alignment the badge would otherwise break.
         Column(
             modifier =
-                if (onIconClick != null)
+                (if (onIconClick != null)
                     Modifier.contextClickable(onClick = onIconClick, onLongClick = onIconLongClick)
-                else Modifier,
-            // Against the text, not centred over the badge: the badge below is wider than the icon,
-            // so centring left a gap between the icon and the edge the names all start from.
-            horizontalAlignment = Alignment.End,
+                else Modifier)
+                    .width(ICON_COLUMN_WIDTH),
+            // Left-aligned with the text: the icon's own left edge sits on the same vertical line the
+            // names start from, so every row's icon and title line up regardless of how the icon was
+            // drawn (some module icons carry their own padding, which previously pushed them inward
+            // and made the list look ragged).
+            horizontalAlignment = Alignment.Start,
         ) {
             // Fixed at the icon's size whatever is drawn inside, so selecting a module cannot resize
-            // its row — a tick larger than the icon would grow this box and reflow the list.
-            Box(modifier = Modifier.size(ICON_SIZE), contentAlignment = Alignment.Center) {
+            // its row — a tick larger than the icon would grow this box and reflow the list. Pinned
+            // to the top-start so the icon, not a centred one, is left-aligned against the edge.
+            Box(modifier = Modifier.size(ICON_SIZE), contentAlignment = Alignment.TopStart) {
                 icon()
                 if (selected) {
                     Box(
@@ -165,7 +186,7 @@ fun ModuleRow(
             apiBadge()
         }
 
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(8.dp))
 
         // A Box, not a third column: reserving a column for the version and reach would take width
         // from every line of the description whether or not anything was there. They overlap the text

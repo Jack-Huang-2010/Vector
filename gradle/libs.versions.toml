@@ -12,6 +12,9 @@ coil = "3.5.0"
 m3 = "1.5.0-alpha26"
 nav3 = "1.1.6"
 navigationevent = "1.1.2"
+# Material Symbols (the M3 icon set) used by the manager UI, matching WeKit. These are
+# Compose Multiplatform artifacts; the `-cmp` Android variant is what we actually resolve.
+composablehorizons-symbols = "2.2.1"
 # Governs every androidx.compose.* artifact below; none of them pin a version.
 compose-bom = "2026.08.00"
 
@@ -44,6 +47,7 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "m3" }
 androidx-compose-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "m3" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+composablehorizons-material-symbols-outlined = { module = "com.composables:icons-material-symbols-outlined-cmp", version.ref = "composablehorizons-symbols" }
 
 # Navigation 3. Stable since Nov 2025; the back stack is a plain observable list
 # of NavKey objects rather than route strings.
@@ -85,6 +89,7 @@ compose = [
     "androidx-compose-material3",
     "androidx-compose-material3-adaptive-navigation-suite",
     "androidx-compose-material-icons-extended",
+    "composablehorizons-material-symbols-outlined",
     "androidx-lifecycle-viewmodel-compose",
     "androidx-navigation3-runtime",
     "androidx-navigation3-ui",

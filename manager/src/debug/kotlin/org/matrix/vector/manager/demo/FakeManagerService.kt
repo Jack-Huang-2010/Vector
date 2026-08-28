@@ -10,17 +10,17 @@ import org.matrix.vector.ipc.IFrameworkInstallReceiver
 import org.matrix.vector.ipc.IManagerService
 import org.matrix.vector.ipc.ModuleLoadFailure
 import org.matrix.vector.ipc.ScopeEntry
-import rikka.parcelablelist.ParcelableListSlice
 import org.matrix.vector.manager.data.model.versionCodeCompat
+import rikka.parcelablelist.ParcelableListSlice
 
 /**
  * The daemon, as a script.
  *
  * The fake sits at the *binder*, which is the boundary between this app and the privileged system,
- * and is the reason a demo mode is worth having at all: everything from here inwards — DaemonClient,
- * the repositories, the view models, the status derivation that turns three booleans into an issue
- * list — runs exactly as it does in production. What is faked is what the device says about itself,
- * not what the manager concludes. A bug in the concluding is still visible.
+ * and is the reason a demo mode is worth having at all: everything from here inwards —
+ * DaemonClient, the repositories, the view models, the status derivation that turns three booleans
+ * into an issue list — runs exactly as it does in production. What is faked is what the device says
+ * about itself, not what the manager concludes. A bug in the concluding is still visible.
  *
  * Two other seams were considered and rejected. Faking a repository would have meant the status
  * derivation never ran, which is the code most likely to be wrong. Faking a view model would have
@@ -32,10 +32,10 @@ import org.matrix.vector.manager.data.model.versionCodeCompat
  * is a lie. With no daemon present the delegating calls return empties rather than throwing, so the
  * demo is still usable on a device with no Vector installed.
  *
- * Subclassing `Stub()` rather than proxying the interface is deliberate on both counts: DaemonClient
- * checks `asBinder().isBinderAlive`, which only a real Binder answers — and a new AIDL method breaks
- * this file's compilation, which is the point. A fake that silently kept working while the daemon
- * grew a new question would quietly stop covering it.
+ * Subclassing `Stub()` rather than proxying the interface is deliberate on both counts:
+ * DaemonClient checks `asBinder().isBinderAlive`, which only a real Binder answers — and a new AIDL
+ * method breaks this file's compilation, which is the point. A fake that silently kept working
+ * while the daemon grew a new question would quietly stop covering it.
  */
 class FakeManagerService(
     private val scenario: DemoScenario,
@@ -104,46 +104,43 @@ class FakeManagerService(
      */
     override fun getBuildStamp(): String? = real?.buildStamp
 
-
     /**
      * A flash, without a flash.
      *
-     * Emits on its own thread and never blocks the caller, because the real one does not either —
-     * a screen that only works when the lines arrive on the binder thread would pass here and hang
-     * on a device.
+     * Emits on its own thread and never blocks the caller, because the real one does not either — a
+     * screen that only works when the lines arrive on the binder thread would pass here and hang on
+     * a device.
      */
     override fun installFrameworkZip(zipPath: String?, receiver: IFrameworkInstallReceiver?) {
         if (receiver == null) return
         Thread {
-                fun say(line: String) {
-                    runCatching { receiver.onLine(line) }
-                    Thread.sleep(220)
+            fun say(line: String) {
+                runCatching { receiver.onLine(line) }
+                Thread.sleep(220)
+            }
+            when (scenario.install) {
+                DemoScenario.InstallScript.NO_ROOT -> {
+                    runCatching { receiver.onFinished(IFrameworkInstallReceiver.INSTALL_NO_ROOT) }
                 }
-                when (scenario.install) {
-                    DemoScenario.InstallScript.NO_ROOT -> {
-                        runCatching {
-                            receiver.onFinished(IFrameworkInstallReceiver.INSTALL_NO_ROOT)
-                        }
-                    }
-                    DemoScenario.InstallScript.SUCCEEDS -> {
-                        say("- Target: $zipPath")
-                        say("- Extracting module files")
-                        say("- Device is arm64-v8a API 36")
-                        say("- Installing Vector")
-                        say("- Setting permissions")
-                        say("- Done. Reboot to apply.")
-                        runCatching { receiver.onFinished(0) }
-                    }
-                    DemoScenario.InstallScript.FAILS_PARTWAY -> {
-                        say("- Target: $zipPath")
-                        say("- Extracting module files")
-                        say("- Device is arm64-v8a API 36")
-                        say("- Installing Vector")
-                        say("! Failed to copy zygisk binary: No space left on device")
-                        runCatching { receiver.onFinished(1) }
-                    }
+                DemoScenario.InstallScript.SUCCEEDS -> {
+                    say("- Target: $zipPath")
+                    say("- Extracting module files")
+                    say("- Device is arm64-v8a API 36")
+                    say("- Installing Vector")
+                    say("- Setting permissions")
+                    say("- Done. Reboot to apply.")
+                    runCatching { receiver.onFinished(0) }
+                }
+                DemoScenario.InstallScript.FAILS_PARTWAY -> {
+                    say("- Target: $zipPath")
+                    say("- Extracting module files")
+                    say("- Device is arm64-v8a API 36")
+                    say("- Installing Vector")
+                    say("! Failed to copy zygisk binary: No space left on device")
+                    runCatching { receiver.onFinished(1) }
                 }
             }
+        }
             .start()
     }
 
@@ -153,9 +150,9 @@ class FakeManagerService(
      * The installed package list, optionally rewritten to look old.
      *
      * This one call is where "is there an update for this module" is really decided: the catalogue
-     * says what the newest version is, and the comparison is against what this returns. Reporting
-     * a low version here is therefore the whole of the "modules are out of date" scenario, and it
-     * has the property that makes these scenarios worth having — nothing downstream is faked. The
+     * says what the newest version is, and the comparison is against what this returns. Reporting a
+     * low version here is therefore the whole of the "modules are out of date" scenario, and it has
+     * the property that makes these scenarios worth having — nothing downstream is faked. The
      * catalogue is the real one, the releases are real, the APK that gets installed is real, and so
      * is the install.
      *
@@ -176,7 +173,8 @@ class FakeManagerService(
         // daemon's own objects.
         val rewritten =
             actual.list.map { info ->
-                val baseline = baselineVersions.putIfAbsent(info.packageName, info.versionCodeCompat)
+                val baseline =
+                    baselineVersions.putIfAbsent(info.packageName, info.versionCodeCompat)
                 if (baseline != null && baseline != info.versionCodeCompat) {
                     // This one has genuinely changed under us since the scenario started, which
                     // for a demo means the manager just installed it. Reporting the truth from

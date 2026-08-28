@@ -1,34 +1,37 @@
 package org.matrix.vector.manager.ui.screens.home
 
-import android.os.Build
 import android.content.Context
+import android.content.res.Configuration
+import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.AddToHomeScreen
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.InstallMobile
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -36,46 +39,43 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.util.Locale
+import kotlinx.coroutines.launch
 import org.matrix.vector.ipc.IManagerService
 import org.matrix.vector.manager.BuildConfig
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.size
-import androidx.compose.ui.draw.alpha
-import android.content.res.Configuration
-import java.util.Locale
 import org.matrix.vector.manager.R
-import org.matrix.vector.ui.R as UiR
 import org.matrix.vector.manager.data.log.CrashRecorder
+import org.matrix.vector.manager.data.log.CrashReport
 import org.matrix.vector.manager.data.model.ManagerCopy
 import org.matrix.vector.manager.data.model.XposedApi
-import org.matrix.vector.manager.data.log.CrashReport
 import org.matrix.vector.manager.data.model.buildStamp
 import org.matrix.vector.manager.data.repository.ManagerInstallStep
-import org.matrix.vector.ui.SnackbarTone
+import org.matrix.vector.ui.CheckSwitch
+import org.matrix.vector.ui.R as UiR
 import org.matrix.vector.ui.SharedSnackbarHost
+import org.matrix.vector.ui.SnackbarTone
 import org.matrix.vector.ui.copyToClipboard
 import org.matrix.vector.ui.show
-import kotlinx.coroutines.launch
 import org.matrix.vector.ui.theme.Mono
 
 /**
@@ -175,7 +175,7 @@ fun SystemStatusScreen(
                     }
                 },
             )
-        }
+        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.padding(padding),
@@ -271,10 +271,10 @@ fun SystemStatusScreen(
  *
  * A card rather than more rows, because these are not the settings the rows above are and did not
  * read as them: a switch is always the same width, so a column of switches lines up, while these
- * trailing controls were a long label, a spinner and a button — three different widths that left the
- * right-hand edge ragged and squeezed each description into a narrow column with nothing beside it.
- * The page already has this shape for "here is a situation, here is what to do about it": IssueCard
- * and CrashCard.
+ * trailing controls were a long label, a spinner and a button — three different widths that left
+ * the right-hand edge ragged and squeezed each description into a narrow column with nothing beside
+ * it. The page already has this shape for "here is a situation, here is what to do about it":
+ * IssueCard and CrashCard.
  *
  * One card rather than one per remedy, because the reader's question is not "should I pin a
  * shortcut" but "which of these do I have" — and each separate card would have to re-explain the
@@ -549,11 +549,11 @@ private fun IssueCard(issue: HealthIssue) {
  * monospace here would be the only thing on the page a reader has to decode rather than read; the
  * trace has its own screen, one tap away, where it can be a list instead of a paragraph. The four
  * are chosen as the answers to what a maintainer asks first: what threw, what it said, the nearest
- * frame that is ours, and when. "Where" is the one worth having on the card at all — it is the
- * fact that decides who picks the report up, and it is buried in the middle of the printed trace.
+ * frame that is ours, and when. "Where" is the one worth having on the card at all — it is the fact
+ * that decides who picks the report up, and it is buried in the middle of the printed trace.
  *
- * The card is absent when there have been no crashes, which is the normal state and deserves no
- * row of its own.
+ * The card is absent when there have been no crashes, which is the normal state and deserves no row
+ * of its own.
  */
 @Composable
 private fun CrashCard(report: CrashReport, onOpenTrace: () -> Unit, onClear: () -> Unit) {
@@ -593,7 +593,9 @@ private fun CrashCard(report: CrashReport, onOpenTrace: () -> Unit, onClear: () 
                 TextButton(onClick = onOpenTrace) {
                     Text(stringResource(R.string.crash_open_trace))
                 }
-                TextButton(onClick = onClear) { Text(stringResource(R.string.crash_recorded_clear)) }
+                TextButton(onClick = onClear) {
+                    Text(stringResource(R.string.crash_recorded_clear))
+                }
             }
         }
     }
@@ -618,8 +620,7 @@ private fun CrashFact(
         Text(
             value,
             style =
-                if (monospace) Mono.copy(fontSize = 14.sp)
-                else MaterialTheme.typography.bodyMedium,
+                if (monospace) Mono.copy(fontSize = 14.sp) else MaterialTheme.typography.bodyMedium,
             color = if (error) colors.error else colors.onSurface,
         )
     }
@@ -661,8 +662,7 @@ private fun InfoRow(row: InfoItem) {
                     buildAnnotatedString {
                         append(row.value)
                         row.detail?.let { detail ->
-                            val muted =
-                                SpanStyle(fontSize = 12.sp, color = colors.onSurfaceVariant)
+                            val muted = SpanStyle(fontSize = 12.sp, color = colors.onSurfaceVariant)
                             withStyle(muted) { append(detail) }
                         }
                     },
@@ -885,7 +885,6 @@ private fun FrameworkToggle(
             )
         }
         Spacer(Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+        CheckSwitch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
-

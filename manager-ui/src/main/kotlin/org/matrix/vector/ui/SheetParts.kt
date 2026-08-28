@@ -17,7 +17,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -118,7 +117,7 @@ fun ToggleRow(
             ),
         supportingContent = subtitle?.let { { Text(it) } },
         leadingContent = { Icon(icon, contentDescription = null) },
-        trailingContent = { Switch(checked = checked, onCheckedChange = null) },
+        trailingContent = { CheckSwitch(checked = checked, onCheckedChange = null) },
         colors = sheetRowColors,
     ) { Text(title) }
 }

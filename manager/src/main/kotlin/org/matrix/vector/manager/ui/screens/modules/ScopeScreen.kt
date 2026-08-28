@@ -1,31 +1,15 @@
 package org.matrix.vector.manager.ui.screens.modules
 
-import org.matrix.vector.manager.ui.screens.modules.ScopeViewModel.Companion.SYSTEM_FRAMEWORK_PACKAGE
-import androidx.compose.foundation.interaction.DragInteraction
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.DoneAll
-import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
-import androidx.compose.material.icons.rounded.RemoveDone
-import androidx.compose.material.icons.rounded.SettingsBackupRestore
-import androidx.compose.material.icons.rounded.SaveAlt
-import androidx.compose.material.icons.rounded.SwapVert
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.rememberBottomSheetState
-import androidx.compose.ui.graphics.vector.ImageVector
-import org.matrix.vector.ui.ChoiceRow
-import org.matrix.vector.ui.SheetAction
-import org.matrix.vector.ui.SheetHeading
-import org.matrix.vector.ui.ToggleRow
-import androidx.activity.compose.BackHandler
+import androidx.activity.BackEventCompat
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,40 +23,50 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.border
-import org.matrix.vector.ui.contextClickable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Launch
-import androidx.compose.material.icons.rounded.Checklist
-import androidx.compose.material.icons.rounded.FilterList
-import androidx.compose.material.icons.rounded.RestartAlt
-import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.Sort
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.DoneAll
+import androidx.compose.material.icons.rounded.FilterList
+import androidx.compose.material.icons.rounded.RemoveDone
+import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.SaveAlt
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SettingsBackupRestore
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -83,6 +77,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -99,19 +95,29 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import org.matrix.vector.ui.SharedAlertDialog
-import org.matrix.vector.manager.ui.theme.LocalizedOverlay
 import org.matrix.vector.manager.R
 import org.matrix.vector.manager.data.model.AppInfo
 import org.matrix.vector.manager.di.ServiceLocator
-import org.matrix.vector.ui.AppIcon
-import org.matrix.vector.ui.SnackbarTone
-import org.matrix.vector.ui.SharedSnackbarHost
-import org.matrix.vector.ui.show
+import org.matrix.vector.manager.ui.components.PackageActionMenuItems
 import org.matrix.vector.manager.ui.components.PackageActionResult
-import org.matrix.vector.manager.ui.components.PackageActionSheet
+import org.matrix.vector.manager.ui.screens.modules.ScopeViewModel.Companion.SYSTEM_FRAMEWORK_PACKAGE
+import org.matrix.vector.manager.ui.theme.LocalizedOverlay
+import org.matrix.vector.ui.AppIcon
+import org.matrix.vector.ui.CheckSwitch
+import org.matrix.vector.ui.ChoiceRow
 import org.matrix.vector.ui.SearchField
+import org.matrix.vector.ui.SharedAlertDialog
+import org.matrix.vector.ui.SharedSnackbarHost
+import org.matrix.vector.ui.SheetAction
+import org.matrix.vector.ui.SheetHeading
+import org.matrix.vector.ui.SnackbarTone
+import org.matrix.vector.ui.ToggleRow
+import org.matrix.vector.ui.contextClickable
+import org.matrix.vector.ui.show
 import org.matrix.vector.ui.theme.Mono
 
 class ScopeViewModelFactory(private val packageName: String, private val userId: Int) :
@@ -134,9 +140,9 @@ class ScopeViewModelFactory(private val packageName: String, private val userId:
  *
  * The screen's shape follows from one fact: **a scope is written whole, never incrementally.** The
  * daemon deletes every scope row of the module, writes the new set and rebuilds its configuration,
- * so sending that on each tap would mean ten rewrites to tick ten apps. Edits are therefore a
- * draft the user builds up, and applying is a deliberate act with its size stated — *3 to add, 1
- * to remove*.
+ * so sending that on each tap would mean ten rewrites to tick ten apps. Edits are therefore a draft
+ * the user builds up, and applying is a deliberate act with its size stated — *3 to add, 1 to
+ * remove*.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -149,6 +155,21 @@ fun ScopeScreen(
     val apps by viewModel.filteredApps.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // The filtered list is computed on a background dispatcher and lands a beat after `loading`
+    // flips false, so the screen can draw one frame of "no matching apps" (or one frame of
+    // "everything") before the real list arrives. Gate the empty state on a short settle window:
+    // only once the list is still empty a moment after loading finished is it genuinely empty,
+    // which keeps a loading flash from reading as an empty module.
+    var emptySettled by remember(packageName, userId) { mutableStateOf(false) }
+    LaunchedEffect(state.loading, apps.isEmpty()) {
+        if (!state.loading && apps.isEmpty()) {
+            delay(200)
+            emptySettled = apps.isEmpty()
+        } else {
+            emptySettled = false
+        }
+    }
+    val wouldStrand by viewModel.wouldStrand.collectAsStateWithLifecycle()
     val pending by viewModel.pendingChanges.collectAsStateWithLifecycle()
     val applying by viewModel.applying.collectAsStateWithLifecycle()
     val query by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -198,6 +219,13 @@ fun ScopeScreen(
         }
     val haptics = LocalHapticFeedback.current
     var confirmStranded by remember { mutableStateOf(false) }
+    // How far a predictive-back gesture has been pulled, 0..1. Drives the same AOSP fade-through
+    // the store detail page uses (see the predictive-pop transitionSpec in VectorApp), rendered
+    // here
+    // directly because this screen's own back handling owns the gesture: nav3's
+    // NavigationBackHandler
+    // is behind this one, so its transitionSpec never plays for this destination.
+    var backProgress by remember { mutableStateOf(0f) }
     // Whether the stranding question has already been put this visit, and answered by neither
     // button. Two slots cannot hold three answers, so when the module has asked for something the
     // buttons are "give it that" and "switch it off" and there is none that says "leave it exactly
@@ -250,11 +278,56 @@ fun ScopeScreen(
         else onNavigateBack()
     }
 
-    // The gesture leaves this screen exactly as the arrow does, so it asks the same question
-    // first. Declared here it wins over the navigator's own back handling.
-    BackHandler { attemptBack() }
+    // Predictive back is a compromise between the two things this screen has to do at once.
+    //
+    // Navigation 3 only plays its predictive-pop animation — the fade-through that *reveals the
+    // previous page behind this one* — when it owns the back gesture. But this screen also has to
+    // ask before leaving when the module would be left enabled with nothing to hook
+    // ([attemptBack]).
+    // It cannot own the gesture and still get the background, so the choice is made *per gesture*:
+    //
+    //  - When leaving is safe, [enabled] is false and this handler steps aside. Navigation 3
+    // receives
+    //    the gesture, plays the fade-through, and the previous page shows behind. No warning
+    // needed.
+    //  - When the module would be stranded, [enabled] is true and this handler intercepts the
+    // gesture
+    //    to ask first. The background is *not* shown in that case — the point of the question is
+    //    exactly that the reader has not decided to leave yet, so a shrinking-away preview would be
+    //    false. It commits to leaving only through the dialog's answer.
+    //
+    // [wouldStrand] is live: ticking a target in the list clears the warning even though the module
+    // opened stranded. Asking once, then believing ([strandWarned]) means a user who dismissed the
+    // question this visit can leave with the ordinary fade-through from then on.
+    PredictiveBackHandler(enabled = wouldStrand && !strandWarned) { progress: Flow<BackEventCompat>
+        ->
+        try {
+            progress.collect { backProgress = it.progress }
+            attemptBack()
+        } catch (e: CancellationException) {
+            // The gesture was cancelled: snap back to the resting state.
+            backProgress = 0f
+            throw e
+        } finally {
+            backProgress = 0f
+        }
+    }
 
+    // The AOSP fade-through, drawn for the (now rare) case where this handler intercepts the
+    // gesture:
+    // nav3 is not playing its own animation then, so this screen fades itself out as the finger
+    // pulls
+    // to keep the response alive. When [PredictiveBackHandler] is disabled (the common, safe case)
+    // [backProgress] stays 0 and this is an identity transform — nav3 is animating instead.
     Scaffold(
+        modifier =
+            Modifier.fillMaxSize().graphicsLayer {
+                val p = backProgress
+                val scale = 1f - 0.1f * p
+                scaleX = scale
+                scaleY = scale
+                alpha = 1f - p
+            },
         topBar = {
             // One line: back, who this is about, and the switch. A large two-line bar would spend
             // a fifth of the screen restating a name the user has just tapped, on a screen whose
@@ -304,7 +377,7 @@ fun ScopeScreen(
                     // list: it is the single most consequential control on the screen. What an
                     // overflow menu would hold here lives in the search field instead, next to the
                     // list it acts on.
-                    Switch(
+                    CheckSwitch(
                         checked = state.isEnabled,
                         onCheckedChange = { enable ->
                             haptics.performHapticFeedback(
@@ -327,7 +400,12 @@ fun ScopeScreen(
             // entry — which is most of them — would otherwise carry a button whose whole function
             // is to report that it has nothing to do.
             if (hasCompanion == true) {
-                FloatingActionButton(onClick = viewModel::openModule) {
+                FloatingActionButton(
+                    onClick = viewModel::openModule,
+                    // No shadow: the button floats over a list of app rows and the drop it would
+                    // cast is the one thing the flat list design has no room for.
+                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+                ) {
                     Icon(
                         Icons.AutoMirrored.Rounded.Launch,
                         contentDescription = stringResource(R.string.action_open_companion),
@@ -378,9 +456,7 @@ fun ScopeScreen(
                     showModules = showModules,
                     hasRecommended = !state.recommended.isEmpty,
                     recommendedOnly = recommendedOnly,
-                    onToggleRecommendedOnly = {
-                        viewModel.setRecommendedOnly(!recommendedOnly)
-                    },
+                    onToggleRecommendedOnly = { viewModel.setRecommendedOnly(!recommendedOnly) },
                     locked = state.recommended.staticScope,
                     onLockedClick = { scope.launch { snackbars.show(staticScopeNotice) } },
                     onToggleSystem = { viewModel.showSystemApps.value = !showSystem },
@@ -413,7 +489,7 @@ fun ScopeScreen(
                 return@Column
             }
 
-            if (apps.isEmpty()) {
+            if (apps.isEmpty() && emptySettled) {
                 ScopeEmptyState()
                 return@Column
             }
@@ -849,7 +925,6 @@ private fun ScopeSheet(
     }
 }
 
-
 /**
  * Why the list is empty, which the list itself can never say.
  *
@@ -947,8 +1022,8 @@ private fun AppRow(
      * A sentence under the package name, for a row whose behaviour a label cannot carry.
      *
      * One slot rather than one flag per case: the two rows that have something to explain — the
-     * framework, and a legacy module's own app — are never the same row, and a boolean apiece
-     * would grow with every one that follows.
+     * framework, and a legacy module's own app — are never the same row, and a boolean apiece would
+     * grow with every one that follows.
      */
     note: Int?,
     onToggle: (Boolean) -> Unit,
@@ -958,70 +1033,77 @@ private fun AppRow(
     val haptics = LocalHapticFeedback.current
     val ring = origin.color()
 
-    ListItem(
-        modifier =
-            Modifier.contextClickable(
-                    onClick = { if (enabled) onToggle(!app.isSelectedInScope) },
-                    onLongClick = {
-                        // The long press is where re-optimize lives, and re-optimize is the fix
-                        // for a hook that silently never fires because ART inlined its target.
-                        haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
-                        menuOpen = true
-                    },
-                )
-                .semantics { role = Role.Checkbox },
-        leadingContent = {
-            // The ring is drawn outside the icon rather than tinting it: an app icon is the user's
-            // own landmark for finding a row and recolouring it would destroy that.
-            AppIcon(
-                applicationInfo = app.applicationInfo,
-                contentDescription = null,
-                size = 36.dp,
-                modifier =
-                    Modifier.border(width = 2.dp, color = ring, shape = CircleShape).padding(4.dp),
-            )
-        },
-        supportingContent = {
-            Column {
-                Text(
-                    ScopeViewModel.displayPackageName(app.packageName),
-                    style = Mono,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (origin != ScopeOrigin.Chosen) {
-                    Text(
-                        text = stringResource(origin.labelRes()),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = ring,
+    // The DropdownMenu must live in the same Box as the row it belongs to: a `DropdownMenu` is a
+    // Popup whose position provider anchors to the layout node it is declared in, so composing it
+    // as a sibling of the ListItem is what keeps the menu beside (and tied to) this row.
+    Box {
+        ListItem(
+            modifier =
+                Modifier.contextClickable(
+                        onClick = { if (enabled) onToggle(!app.isSelectedInScope) },
+                        onLongClick = {
+                            // The long press is where re-optimize lives, and re-optimize is the fix
+                            // for a hook that silently never fires because ART inlined its target.
+                            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            menuOpen = true
+                        },
                     )
-                }
-                // Why this row does not behave like the rest: the framework is one process shared
-                // by every user, and a legacy module's own app is in the scope without anyone
-                // having put it there. Both are things a checkbox cannot say.
-                if (note != null) {
+                    .semantics { role = Role.Checkbox },
+            leadingContent = {
+                // The ring is drawn outside the icon rather than tinting it: an app icon is the
+                // user's
+                // own landmark for finding a row and recolouring it would destroy that.
+                AppIcon(
+                    applicationInfo = app.applicationInfo,
+                    contentDescription = null,
+                    size = 36.dp,
+                    modifier =
+                        Modifier.border(width = 2.dp, color = ring, shape = CircleShape)
+                            .padding(4.dp),
+                )
+            },
+            supportingContent = {
+                Column {
                     Text(
-                        text = stringResource(note),
-                        style = MaterialTheme.typography.labelSmall,
+                        ScopeViewModel.displayPackageName(app.packageName),
+                        style = Mono,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (origin != ScopeOrigin.Chosen) {
+                        Text(
+                            text = stringResource(origin.labelRes()),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = ring,
+                        )
+                    }
+                    // Why this row does not behave like the rest: the framework is one process
+                    // shared
+                    // by every user, and a legacy module's own app is in the scope without anyone
+                    // having put it there. Both are things a checkbox cannot say.
+                    if (note != null) {
+                        Text(
+                            text = stringResource(note),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-            }
-        },
-        trailingContent = { Checkbox(checked = app.isSelectedInScope, onCheckedChange = null) },
-        colors =
-            ListItemDefaults.colors(
-                containerColor = Color.Transparent
-            ),
-    ) { Text(app.appName) }
-    if (menuOpen) {
-        PackageActionSheet(
+            },
+            trailingContent = { Checkbox(checked = app.isSelectedInScope, onCheckedChange = null) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        ) {
+            Text(app.appName)
+        }
+
+        PackageActionMenuItems(
+            expanded = menuOpen,
+            onDismiss = { menuOpen = false },
             packageName = app.packageName,
             userId = app.userId,
             appName = app.appName,
             applicationInfo = app.applicationInfo,
             isModule = false,
-            onDismiss = { menuOpen = false },
             onResult = onAction,
         )
     }

@@ -84,14 +84,14 @@
     <string name="appearance_theme_system">跟随系统</string>
     <string name="appearance_theme_light">浅色</string>
     <string name="appearance_theme_dark">深色</string>
-    <string name="appearance_dynamic_color">取色自壁纸</string>
-    <string name="appearance_amoled">深色模式使用纯黑</string>
+    <string name="appearance_dynamic_color">壁纸取色</string>
+    <string name="appearance_amoled">深色模式使用纯黑背景</string>
     <string name="appearance_amoled_summary">在 OLED 屏幕上更省电。</string>
-    <string name="egg_two_more">还差两次…</string>
-    <string name="egg_one_more">还差一次…</string>
+    <string name="egg_two_more">再点两次以触发彩蛋…</string>
+    <string name="egg_one_more">再点一次以触发彩蛋…</string>
 
     <string name="modules_empty">尚未安装任何模块。</string>
-    <string name="modules_active_of">%2$d 个模块中有 %1$d 个已启用</string>
+    <string name="modules_active_of">%2$d 个模块中有 %1$d 个已加载</string>
     <string name="modules_no_match">没有符合该搜索或筛选条件的模块。</string>
     <string name="modules_backup">备份模块</string>
     <string name="modules_restore">恢复模块</string>
@@ -102,13 +102,13 @@
     <string name="modules_search_hint">搜索模块</string>
     <string name="modules_clear_search">清除搜索</string>
     <string name="modules_filter">筛选</string>
-    <string name="modules_section_active">运行中</string>
-    <string name="modules_section_inactive">未运行</string>
+    <string name="modules_section_active">已加载</string>
+    <string name="modules_section_inactive">未加载</string>
     <string name="modules_scope_more">+%1$d</string>
-    <string name="modules_sort_enabled">运行中优先</string>
+    <string name="modules_sort_enabled">已加载</string>
     <string name="modules_sort_name">按名称</string>
     <string name="modules_sort_recent">最近更新</string>
-    <string name="modules_sort_scope">作用域最广</string>
+    <string name="modules_sort_scope">作用域</string>
     <string name="modules_filter_all">全部</string>
     <string name="modules_filter_active">已启用</string>
     <string name="modules_filter_inactive">未启用</string>
@@ -124,7 +124,7 @@
     <string name="ambience_maze">迷宫</string>
     <string name="ambience_circuit">电路</string>
     <string name="ambience_matrix">代码雨</string>
-    <string name="ambience_none">静止</string>
+    <string name="ambience_none">无</string>
 
     <string name="settings_navigation">导航</string>
     <string name="settings_floating_nav">悬浮导航</string>

@@ -1,11 +1,14 @@
 package org.matrix.vector.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,17 +27,28 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun ApiBadge(label: String, value: String, incompatible: Boolean = false) {
     val colors = MaterialTheme.colorScheme
-    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+    // Single line, never wrapping: the badge sits in a fixed-width column, and a wrapping badge
+    // (e.g. "LSPosed\n102") would break the shared name/description start that the fixed column
+    // exists to keep. The scale name and number stay on one line however narrow the column is.
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        modifier = Modifier.width(IntrinsicSize.Max),
+    ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
             color = colors.onSurfaceVariant.copy(alpha = 0.7f),
+            maxLines = 1,
+            softWrap = false,
         )
         Text(
             text = value,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = if (incompatible) colors.error else colors.primary,
+            maxLines = 1,
+            softWrap = false,
         )
     }
 }

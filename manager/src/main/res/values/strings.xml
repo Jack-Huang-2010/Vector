@@ -179,7 +179,7 @@
     <string name="modules_active_of">%1$d of %2$d active</string>
     <string name="modules_no_match">No module matches that search or filter.</string>
     <string name="modules_api_scale_legacy" translatable="false">Xposed</string>
-    <string name="modules_api_scale_modern" translatable="false">API</string>
+    <string name="modules_api_scale_modern" translatable="false">LSPosed</string>
     <string name="modules_backup">Back up modules</string>
     <string name="modules_restore">Restore modules</string>
     <string name="modules_backup_done">Backed up %1$d modules and their scopes.</string>

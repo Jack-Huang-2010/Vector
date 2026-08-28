@@ -1,14 +1,11 @@
 package org.matrix.vector.manager.ui.components
 
-import org.matrix.vector.ui.AppIcon
-import org.matrix.vector.ui.SnackbarTone
-import org.matrix.vector.ui.SharedAlertDialog
-import org.matrix.vector.ui.R as UiR
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.text.format.Formatter
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,56 +16,60 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Launch
+import androidx.compose.material.icons.rounded.ArrowCircleUp
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.NotificationsOff
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Stop
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.matrix.vector.manager.R
+import org.matrix.vector.manager.data.repository.ModuleUpdateQueue
+import org.matrix.vector.manager.di.ServiceLocator
 import org.matrix.vector.manager.logE
 import org.matrix.vector.manager.logW
-import org.matrix.vector.manager.ui.theme.LocalizedOverlay
-import org.matrix.vector.manager.R
-import android.text.format.Formatter
-import androidx.compose.material.icons.rounded.ArrowCircleUp
-import androidx.compose.material.icons.rounded.CloudDownload
-import androidx.compose.material.icons.rounded.CloudOff
-import androidx.compose.material.icons.rounded.NotificationsOff
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.matrix.vector.ui.ActionDrawerItem
-import org.matrix.vector.ui.store.ConfirmInstall
-import org.matrix.vector.ui.store.ReleaseAsset
-import org.matrix.vector.manager.data.repository.ModuleUpdateQueue
-import org.matrix.vector.ui.store.StoreChannel
-import org.matrix.vector.ui.store.releasesOn
-import androidx.compose.material.icons.rounded.RestartAlt
-import androidx.compose.material3.TextButton
 import org.matrix.vector.manager.ui.screens.modules.ScopeViewModel
 import org.matrix.vector.manager.ui.screens.modules.ScopeViewModel.Companion.SYSTEM_FRAMEWORK_PACKAGE
-import org.matrix.vector.manager.di.ServiceLocator
+import org.matrix.vector.manager.ui.theme.LocalizedOverlay
+import org.matrix.vector.ui.ActionDrawerItem
+import org.matrix.vector.ui.AppIcon
+import org.matrix.vector.ui.R as UiR
+import org.matrix.vector.ui.SharedAlertDialog
+import org.matrix.vector.ui.SnackbarTone
+import org.matrix.vector.ui.store.ConfirmInstall
+import org.matrix.vector.ui.store.ReleaseAsset
+import org.matrix.vector.ui.store.StoreChannel
+import org.matrix.vector.ui.store.releasesOn
 import org.matrix.vector.ui.theme.Mono
 
 /** What a long press did, and how it went. */
@@ -191,208 +192,235 @@ fun PackageActionSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-LocalizedOverlay {
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AppIcon(applicationInfo = applicationInfo, contentDescription = null, size = 44.dp)
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = appName,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = ScopeViewModel.displayPackageName(packageName),
-                    style = Mono,
-                    color = colors.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-
-        HorizontalDivider(Modifier.padding(horizontal = 24.dp))
-        Spacer(Modifier.height(4.dp))
-
-        if (isModule) {
-            ModuleUpdateSection(
-                packageName = packageName,
-                onOpenStore = onOpenStore,
-                onDismiss = onDismiss,
-                onResult = onResult,
-            )
-        }
-
-        // A module is not an app you "open" — most have nothing to look at. What it may have is a
-        // companion: the screen its author wrote to configure it, which is what the Xposed settings
-        // category marks. Naming it that way is the difference between a control that looks
-        // pointless and one that says what it is for.
-        if (!isSystemFramework && openable == true)
-        ActionDrawerItem(
-            icon = Icons.AutoMirrored.Rounded.Launch,
-            title =
-                stringResource(
-                    if (isModule) R.string.action_open_companion else R.string.action_launch
-                ),
-            subtitle =
-                if (isModule) stringResource(R.string.action_open_companion_summary) else null,
-        ) {
-            finish {
-                val result = daemon.openAppUi(packageName, userId, companionFirst = isModule)
-                if (result.getOrDefault(false)) {
-                    PackageActionResult(R.string.action_launched)
-                } else {
-                    // The row is only drawn once findAppUi resolved a target, so reaching this
-                    // branch contradicts what was rendered. One line for both shapes: a failed
-                    // transaction carries a throwable, a resolve that found nothing does not.
-                    logE(
-                        "actions: open of $packageName for user $userId did nothing, though the " +
-                            "row had resolved a target",
-                        result.exceptionOrNull(),
+        LocalizedOverlay {
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppIcon(applicationInfo = applicationInfo, contentDescription = null, size = 44.dp)
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = appName,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    PackageActionResult(R.string.action_no_launcher, tone = SnackbarTone.Failure)
-                }
-            }
-        }
-
-        if (!isSystemFramework)
-        ActionDrawerItem(icon = Icons.Rounded.Info, title = stringResource(R.string.action_app_info)) {
-            finish {
-                val intent =
-                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                        .setData(Uri.fromParts("package", packageName, null))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                // `noUserSwitch = false`, so the daemon switches to the target's profile parent
-                // and locks the screen first. That is right here: this is Settings' own details
-                // page for a package in that profile, which is not an activity that shows for
-                // whichever user is current.
-                val started = daemon.startActivityAsUser(intent, userId, noUserSwitch = false)
-                // The dominant failure is not an exception: the daemon hands back the activity
-                // manager's own start code, so a refused user switch or a screen that would not
-                // start arrives as a number rather than as a throw. Started means 0 to 99 — the
-                // band `ActivityManager.isStartResultSuccessful` tests, written out because those
-                // constants are hidden — with -100 to -1 fatal and 100 to 199 non-fatal refusals.
-                val code = started.getOrDefault(-1)
-                if (code !in 0..99) {
-                    logE(
-                        "actions: opening app info for $packageName as user $userId failed " +
-                            "(code $code)",
-                        started.exceptionOrNull(),
+                    Text(
+                        text = ScopeViewModel.displayPackageName(packageName),
+                        style = Mono,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                PackageActionResult(R.string.action_opened_info)
             }
-        }
 
-        // Force-stopping the framework is a soft reboot, and calling it anything else would hide
-        // what the button does: the daemon restarts the primary zygote, so `system_server` and
-        // every app forked from it go down together. Named and explained accordingly, and
-        // confirmed first — this is the one action on this sheet that ends what the reader is
-        // doing everywhere else on the phone.
-        if (isSystemFramework) {
-            ActionDrawerItem(
-                icon = Icons.Rounded.RestartAlt,
-                title = stringResource(R.string.action_soft_reboot),
-                subtitle = stringResource(R.string.action_soft_reboot_summary),
-                tint = colors.error,
-            ) {
-                confirmSoftReboot = true
+            HorizontalDivider(Modifier.padding(horizontal = 24.dp))
+            Spacer(Modifier.height(4.dp))
+
+            if (isModule) {
+                ModuleUpdateSection(
+                    packageName = packageName,
+                    onOpenStore = onOpenStore,
+                    onDismiss = onDismiss,
+                    onResult = onResult,
+                )
             }
-        } else {
-            ActionDrawerItem(
-                icon = Icons.Rounded.Stop,
-                title = stringResource(R.string.action_force_stop),
-            ) {
-                finish {
-                    val result =
-                        daemon.forceStopPackage(packageName, userId).onFailure { e ->
-                            logE("actions: force stop of $packageName (user $userId) failed", e)
+
+            // A module is not an app you "open" — most have nothing to look at. What it may have is
+            // a
+            // companion: the screen its author wrote to configure it, which is what the Xposed
+            // settings
+            // category marks. Naming it that way is the difference between a control that looks
+            // pointless and one that says what it is for.
+            if (!isSystemFramework && openable == true)
+                ActionDrawerItem(
+                    icon = Icons.AutoMirrored.Rounded.Launch,
+                    title =
+                        stringResource(
+                            if (isModule) R.string.action_open_companion else R.string.action_launch
+                        ),
+                    subtitle =
+                        if (isModule) stringResource(R.string.action_open_companion_summary)
+                        else null,
+                ) {
+                    finish {
+                        val result =
+                            daemon.openAppUi(packageName, userId, companionFirst = isModule)
+                        if (result.getOrDefault(false)) {
+                            PackageActionResult(R.string.action_launched)
+                        } else {
+                            // The row is only drawn once findAppUi resolved a target, so reaching
+                            // this
+                            // branch contradicts what was rendered. One line for both shapes: a
+                            // failed
+                            // transaction carries a throwable, a resolve that found nothing does
+                            // not.
+                            logE(
+                                "actions: open of $packageName for user $userId did nothing, though the " +
+                                    "row had resolved a target",
+                                result.exceptionOrNull(),
+                            )
+                            PackageActionResult(
+                                R.string.action_no_launcher,
+                                tone = SnackbarTone.Failure,
+                            )
                         }
-                    // Unlike uninstall below there is no boolean to weigh: the call answers with
-                    // Unit, so the Result itself is the verdict — a failure here means the
-                    // transaction never reached a live daemon and nothing was stopped.
-                    val ok = result.isSuccess
-                    PackageActionResult(
-                        if (ok) R.string.action_force_stopped
-                        else R.string.action_force_stop_failed,
-                        appName,
-                        tone = if (ok) SnackbarTone.Success else SnackbarTone.Failure,
-                    )
+                    }
                 }
-            }
-        }
 
-        // Only for a hook target. Re-optimizing recompiles an app so that ART stops inlining the
-        // methods a module wants to hook — which is about the app being hooked, not about the
-        // module doing the hooking, so on a module it would be an expensive button for nothing.
-        if (!isModule && !isSystemFramework) {
-            ActionDrawerItem(
-                icon = Icons.Rounded.Bolt,
-                title = stringResource(R.string.action_optimize),
-                subtitle = stringResource(R.string.action_optimize_summary),
-                tint = colors.primary,
-            ) {
-                finish {
-                    // Slow — this recompiles the app — so the caller is told it started and told
-                    // again when it finishes.
-                    onResult(
-                        PackageActionResult(
-                            R.string.action_optimizing,
-                            appName,
-                            tone = SnackbarTone.Working,
-                        )
-                    )
-                    val ok =
-                        daemon
-                            .optimizePackage(packageName)
-                            .onFailure { e ->
-                                logE("actions: re-optimize of $packageName failed", e)
+            if (!isSystemFramework)
+                ActionDrawerItem(
+                    icon = Icons.Rounded.Info,
+                    title = stringResource(R.string.action_app_info),
+                ) {
+                    finish {
+                        val intent =
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                .setData(Uri.fromParts("package", packageName, null))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        // `noUserSwitch = false`, so the daemon switches to the target's profile
+                        // parent
+                        // and locks the screen first. That is right here: this is Settings' own
+                        // details
+                        // page for a package in that profile, which is not an activity that shows
+                        // for
+                        // whichever user is current.
+                        val started =
+                            daemon.startActivityAsUser(intent, userId, noUserSwitch = false)
+                        // The dominant failure is not an exception: the daemon hands back the
+                        // activity
+                        // manager's own start code, so a refused user switch or a screen that would
+                        // not
+                        // start arrives as a number rather than as a throw. Started means 0 to 99 —
+                        // the
+                        // band `ActivityManager.isStartResultSuccessful` tests, written out because
+                        // those
+                        // constants are hidden — with -100 to -1 fatal and 100 to 199 non-fatal
+                        // refusals.
+                        val code = started.getOrDefault(-1)
+                        if (code !in 0..99) {
+                            logE(
+                                "actions: opening app info for $packageName as user $userId failed " +
+                                    "(code $code)",
+                                started.exceptionOrNull(),
+                            )
+                        }
+                        PackageActionResult(R.string.action_opened_info)
+                    }
+                }
+
+            // Force-stopping the framework is a soft reboot, and calling it anything else would
+            // hide
+            // what the button does: the daemon restarts the primary zygote, so `system_server` and
+            // every app forked from it go down together. Named and explained accordingly, and
+            // confirmed first — this is the one action on this sheet that ends what the reader is
+            // doing everywhere else on the phone.
+            if (isSystemFramework) {
+                ActionDrawerItem(
+                    icon = Icons.Rounded.RestartAlt,
+                    title = stringResource(R.string.action_soft_reboot),
+                    subtitle = stringResource(R.string.action_soft_reboot_summary),
+                    tint = colors.error,
+                ) {
+                    confirmSoftReboot = true
+                }
+            } else {
+                ActionDrawerItem(
+                    icon = Icons.Rounded.Stop,
+                    title = stringResource(R.string.action_force_stop),
+                ) {
+                    finish {
+                        val result =
+                            daemon.forceStopPackage(packageName, userId).onFailure { e ->
+                                logE("actions: force stop of $packageName (user $userId) failed", e)
                             }
-                            .getOrDefault(false)
-                    PackageActionResult(
-                        if (ok) R.string.action_optimized else R.string.action_optimize_failed,
-                        appName,
-                        tone = if (ok) SnackbarTone.Success else SnackbarTone.Failure,
-                    )
-                }
-            }
-        }
-
-        if (isModule) {
-            HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
-            ActionDrawerItem(
-                icon = Icons.Rounded.Delete,
-                title = stringResource(R.string.action_uninstall),
-                tint = colors.error,
-            ) {
-                finish {
-                    val result = daemon.uninstallPackage(packageName, userId)
-                    val ok = result.getOrDefault(false)
-                    // On `!ok`: a device-policy refusal and a missing user come back as a plain
-                    // `false`, which onFailure would never see.
-                    if (!ok) {
-                        logE(
-                            "actions: uninstall of $packageName for user $userId failed",
-                            result.exceptionOrNull(),
+                        // Unlike uninstall below there is no boolean to weigh: the call answers
+                        // with
+                        // Unit, so the Result itself is the verdict — a failure here means the
+                        // transaction never reached a live daemon and nothing was stopped.
+                        val ok = result.isSuccess
+                        PackageActionResult(
+                            if (ok) R.string.action_force_stopped
+                            else R.string.action_force_stop_failed,
+                            appName,
+                            tone = if (ok) SnackbarTone.Success else SnackbarTone.Failure,
                         )
                     }
-                    PackageActionResult(
-                        if (ok) R.string.action_uninstalled else R.string.action_uninstall_failed,
-                        appName,
-                        tone = if (ok) SnackbarTone.Success else SnackbarTone.Failure,
-                    )
                 }
             }
-        }
 
-        Spacer(Modifier.height(24.dp))
+            // Only for a hook target. Re-optimizing recompiles an app so that ART stops inlining
+            // the
+            // methods a module wants to hook — which is about the app being hooked, not about the
+            // module doing the hooking, so on a module it would be an expensive button for nothing.
+            if (!isModule && !isSystemFramework) {
+                ActionDrawerItem(
+                    icon = Icons.Rounded.Bolt,
+                    title = stringResource(R.string.action_optimize),
+                    subtitle = stringResource(R.string.action_optimize_summary),
+                    tint = colors.primary,
+                ) {
+                    finish {
+                        // Slow — this recompiles the app — so the caller is told it started and
+                        // told
+                        // again when it finishes.
+                        onResult(
+                            PackageActionResult(
+                                R.string.action_optimizing,
+                                appName,
+                                tone = SnackbarTone.Working,
+                            )
+                        )
+                        val ok =
+                            daemon
+                                .optimizePackage(packageName)
+                                .onFailure { e ->
+                                    logE("actions: re-optimize of $packageName failed", e)
+                                }
+                                .getOrDefault(false)
+                        PackageActionResult(
+                            if (ok) R.string.action_optimized else R.string.action_optimize_failed,
+                            appName,
+                            tone = if (ok) SnackbarTone.Success else SnackbarTone.Failure,
+                        )
+                    }
+                }
+            }
+
+            if (isModule) {
+                HorizontalDivider(Modifier.padding(horizontal = 24.dp, vertical = 4.dp))
+                ActionDrawerItem(
+                    icon = Icons.Rounded.Delete,
+                    title = stringResource(R.string.action_uninstall),
+                    tint = colors.error,
+                ) {
+                    finish {
+                        val result = daemon.uninstallPackage(packageName, userId)
+                        val ok = result.getOrDefault(false)
+                        // On `!ok`: a device-policy refusal and a missing user come back as a plain
+                        // `false`, which onFailure would never see.
+                        if (!ok) {
+                            logE(
+                                "actions: uninstall of $packageName for user $userId failed",
+                                result.exceptionOrNull(),
+                            )
+                        }
+                        PackageActionResult(
+                            if (ok) R.string.action_uninstalled
+                            else R.string.action_uninstall_failed,
+                            appName,
+                            tone = if (ok) SnackbarTone.Success else SnackbarTone.Failure,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+        }
     }
-}
 }
 
 /**
@@ -422,7 +450,17 @@ private fun ActionToggleRow(
                 role = Role.Switch,
                 onValueChange = onCheckedChange,
             ),
-        trailing = { Switch(checked = checked, onCheckedChange = null) },
+        // The KSU-style state mark: a check when on, nothing when off. The row is still a switch to
+        // a screen reader (role above), but the visible cue is the check rather than a thumb.
+        trailing = {
+            if (checked) {
+                Icon(
+                    MaterialSymbols.Outlined.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
     )
 }
 

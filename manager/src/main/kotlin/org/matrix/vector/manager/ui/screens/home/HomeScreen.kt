@@ -3,47 +3,55 @@ package org.matrix.vector.manager.ui.screens.home
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.ExperimentalFoundationApi
-import org.matrix.vector.ui.contextClickable
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.CallSplit
 import androidx.compose.material.icons.automirrored.rounded.AddToHomeScreen
-import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.FilterAlt
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowDown
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowUp
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,66 +67,55 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.material3.InputChip
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material.icons.rounded.KeyboardDoubleArrowDown
-import androidx.compose.material.icons.rounded.KeyboardDoubleArrowUp
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.launch
-import org.matrix.vector.manager.ui.theme.LocalizedOverlay
 import org.matrix.vector.manager.R
-import org.matrix.vector.manager.ui.theme.CROWDIN_URL
-import org.matrix.vector.manager.ui.theme.VectorLocaleController
-import org.matrix.vector.ui.locale.LanguageSheet
-import org.matrix.vector.ui.locale.currentLocale
-import org.matrix.vector.manager.di.ServiceLocator
-import org.matrix.vector.ui.SharedAlertDialog
-import org.matrix.vector.ui.SharedSnackbarHost
-import org.matrix.vector.ui.show
 import org.matrix.vector.manager.data.github.CommunityFeed
+import org.matrix.vector.manager.data.github.Contributor
 import org.matrix.vector.manager.data.github.FeedItem
 import org.matrix.vector.manager.data.github.FeedLayout
-import org.matrix.vector.manager.data.github.Contributor
 import org.matrix.vector.manager.data.github.GitHubRepository
 import org.matrix.vector.manager.data.github.TimelineCommit
+import org.matrix.vector.manager.di.ServiceLocator
 import org.matrix.vector.manager.ui.components.BotBundleRow
 import org.matrix.vector.manager.ui.components.CommitRow
-import org.matrix.vector.manager.ui.components.InstalledMarkerRow
-import org.matrix.vector.manager.ui.components.MonthMarkerRow
+import org.matrix.vector.manager.ui.components.ContributorAvatar
 import org.matrix.vector.manager.ui.components.GapRow
 import org.matrix.vector.manager.ui.components.HistoryFootRow
-import org.matrix.vector.manager.ui.components.ContributorAvatar
+import org.matrix.vector.manager.ui.components.InstalledMarkerRow
+import org.matrix.vector.manager.ui.components.MonthMarkerRow
 import org.matrix.vector.manager.ui.components.TakePartSection
-import org.matrix.vector.ui.UpdatableVersion
 import org.matrix.vector.manager.ui.components.VectorAmbienceSettings
 import org.matrix.vector.manager.ui.components.statusWordRes
 import org.matrix.vector.manager.ui.components.toTone
-import org.matrix.vector.ui.StatusHeader
-import org.matrix.vector.ui.ambience.AmbienceKind
 import org.matrix.vector.manager.ui.screens.splash.WingedVictory
+import org.matrix.vector.manager.ui.theme.CROWDIN_URL
+import org.matrix.vector.manager.ui.theme.LocalizedOverlay
+import org.matrix.vector.manager.ui.theme.VectorLocaleController
 import org.matrix.vector.ui.RepoStatsRow
+import org.matrix.vector.ui.SharedAlertDialog
+import org.matrix.vector.ui.SharedSnackbarHost
+import org.matrix.vector.ui.StatusHeader
+import org.matrix.vector.ui.UpdatableVersion
+import org.matrix.vector.ui.ambience.AmbienceKind
+import org.matrix.vector.ui.contextClickable
+import org.matrix.vector.ui.locale.LanguageSheet
+import org.matrix.vector.ui.locale.currentLocale
+import org.matrix.vector.ui.show
 import org.matrix.vector.ui.theme.Mono
 
 /**
@@ -130,7 +127,8 @@ import org.matrix.vector.ui.theme.Mono
  *
  * The activity window is a span of time rather than "the latest N commits" — six months by default,
  * and the reader's to change from the appearance sheet. In a quiet stretch the page honestly reads
- * *7 commits by 4 people*, which is real information about the project; a rolling N would hide that.
+ * *7 commits by 4 people*, which is real information about the project; a rolling N would hide
+ * that.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -337,14 +335,14 @@ fun HomeScreen(
                 onOpenLanguage = { showLanguage = true },
                 onBrandTap = ::onBrandTap,
                 detail = { contentColor ->
-                    val detailText =
-                        buildList {
-                                status.versionLabel?.let { add(it) }
-                                status.apiVersion?.let { add("API $it") }
-                            }
-                            .joinToString("  ·  ")
+                    val detailText = buildList {
+                        status.versionLabel?.let { add(it) }
+                        status.apiVersion?.let { add("API $it") }
+                    }
+                        .joinToString("  ·  ")
                     if (detailText.isNotEmpty()) {
-                        // The version line becomes the way in to the update, because it is the thing
+                        // The version line becomes the way in to the update, because it is the
+                        // thing
                         // the mark is attached to. Tappable whether or not there is an update, so
                         // "you are up to date" stays reachable.
                         UpdatableVersion(
@@ -425,27 +423,26 @@ fun HomeScreen(
             properties =
                 DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = true),
         ) {
-LocalizedOverlay {
-
-            Box(
-                modifier =
-                    Modifier.fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) {
-                            showSplash = false
-                        }
-            ) {
-                WingedVictory()
-            }
-            LaunchedEffect(Unit) {
-                kotlinx.coroutines.delay(2800)
-                showSplash = false
+            LocalizedOverlay {
+                Box(
+                    modifier =
+                        Modifier.fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) {
+                                showSplash = false
+                            }
+                ) {
+                    WingedVictory()
+                }
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(2800)
+                    showSplash = false
+                }
             }
         }
-}
     }
 }
 
@@ -667,7 +664,8 @@ private fun QuarterHeadline(feed: CommunityFeed, windowChanged: Boolean) {
                     feed.commitCount,
                     feed.commitCount,
                 )
-            val by = context.resources.getQuantityString(R.plurals.home_people_count, people, people)
+            val by =
+                context.resources.getQuantityString(R.plurals.home_people_count, people, people)
             val since =
                 DateFormat.getDateInstance(DateFormat.MEDIUM, currentLocale())
                     .format(Date(feed.windowStartEpochSeconds * 1000))
@@ -760,6 +758,16 @@ private fun ScrollControls(listState: LazyListState, modifier: Modifier = Modifi
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            FilledTonalIconButton(
+                onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    Icons.Rounded.KeyboardDoubleArrowUp,
+                    contentDescription = stringResource(R.string.home_scroll_top),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             AnimatedVisibility(visible = !atEnd, enter = fadeIn(), exit = fadeOut()) {
                 FilledTonalIconButton(
                     onClick = {
@@ -780,22 +788,13 @@ private fun ScrollControls(listState: LazyListState, modifier: Modifier = Modifi
                     )
                 }
             }
-            FilledTonalIconButton(
-                onClick = { scope.launch { listState.animateScrollToItem(0) } },
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    Icons.Rounded.KeyboardDoubleArrowUp,
-                    contentDescription = stringResource(R.string.home_scroll_top),
-                    modifier = Modifier.size(20.dp),
-                )
-            }
         }
     }
 }
 
 /**
- * What filter mode looks like: who is being shown, how much of the history that is, and the way out.
+ * What filter mode looks like: who is being shown, how much of the history that is, and the way
+ * out.
  *
  * It is a bar rather than a badge on the header because it has to carry the exit. A filtered list
  * that gives no visible way back is the sort of state people escape by force-quitting the app, and

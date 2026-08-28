@@ -44,6 +44,23 @@ sealed interface TopLevelRoute : Route {
     @Serializable data object Logs : TopLevelRoute
 }
 
+/**
+ * The fixed foot of the back stack: the top-level panels as a finger-following pager.
+ *
+ * Navigation 3 is a single scene stack, and this app's details are *on top of* the tab pages rather
+ * than alongside them. So the root is one entry that renders the horizontally-swipeable pager of
+ * the reader's panels, and a detail is a second entry pushed above it. Having a real root entry —
+ * rather than letting the root *be* whichever panel is current — is what lets [Navigator] keep the
+ * pager mounted while a detail covers it, so backing out of a detail (system back button, mouse
+ * right-click, or a predictive swipe) plays [NavDisplay.popTransitionSpec]'s fade-through and the
+ * previous page shows behind instead of the whole thing just vanishing.
+ *
+ * Which panel the pager is standing on lives in Navigator as [Navigator.currentTab], not in the
+ * stack: switching tabs is a pager gesture that must not disturb the stack, and the fixed
+ * [TopLevel] root is what makes that possible.
+ */
+@Serializable data object TopLevel : Route
+
 @Serializable data class Scope(val packageName: String, val userId: Int) : Route
 
 @Serializable data class StoreDetail(val packageName: String) : Route

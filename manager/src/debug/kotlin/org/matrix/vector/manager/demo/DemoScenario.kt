@@ -64,10 +64,10 @@ data class DemoScenario(
      *
      * Reachable through this seam after all, which was not obvious: whether an update *exists* is
      * decided by comparing the release list against the installed version code — and that version
-     * comes from the daemon, not from GitHub. Reporting an old one is enough to make a real
-     * release look like an update, so the whole flow can be exercised without faking any network
-     * traffic. The release list itself is genuinely GitHub's, which makes this closer to the real
-     * thing than a canned one would be.
+     * comes from the daemon, not from GitHub. Reporting an old one is enough to make a real release
+     * look like an update, so the whole flow can be exercised without faking any network traffic.
+     * The release list itself is genuinely GitHub's, which makes this closer to the real thing than
+     * a canned one would be.
      */
     enum class InstallScript {
         SUCCEEDS,

@@ -47,8 +47,8 @@ import androidx.compose.material.icons.rounded.UnfoldLess
 import androidx.compose.material.icons.rounded.UnfoldMore
 import androidx.compose.material.icons.automirrored.rounded.Label
 import androidx.compose.material.icons.rounded.SearchOff
-import androidx.compose.material.icons.rounded.VerticalAlignBottom
-import androidx.compose.material.icons.rounded.VerticalAlignTop
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowDown
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowUp
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material.icons.automirrored.rounded.WrapText
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,12 +65,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -107,6 +106,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import org.matrix.vector.ui.CheckSwitch
 import org.matrix.vector.ui.LocalDialogLocalizer
 import org.matrix.vector.ui.PanelHeader
 import org.matrix.vector.ui.SearchField
@@ -355,7 +355,7 @@ private fun LogPane(
     LaunchedEffect(state.scroll?.token, jumpInset) {
         val command = state.scroll ?: return@LaunchedEffect
         if (state.rows.isNotEmpty()) {
-            listState.scrollToItem(command.position.coerceIn(0, state.rows.lastIndex))
+            listState.animateScrollToItem(command.position.coerceIn(0, state.rows.lastIndex))
         }
     }
 
@@ -544,23 +544,32 @@ private fun LogList(
         // file: hiding one would change the container's height, which is the list's bottom inset,
         // and so shift the log under the reader as a side effect of scrolling.
         if (showJump) {
-            Row(
+            Column(
                 modifier =
                     Modifier.align(Alignment.BottomEnd)
                         .onSizeChanged { onJumpInset(it.height) }
                         .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SmallFloatingActionButton(onClick = { viewModel.jumpToOldest(tab) }) {
+                FilledTonalIconButton(
+                    onClick = { viewModel.jumpToOldest(tab) },
+                    modifier = Modifier.size(40.dp),
+                ) {
                     Icon(
-                        Icons.Rounded.VerticalAlignTop,
+                        Icons.Rounded.KeyboardDoubleArrowUp,
                         contentDescription = stringResource(R.string.logs_jump_oldest),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
-                SmallFloatingActionButton(onClick = { viewModel.jumpToNewest(tab) }) {
+                FilledTonalIconButton(
+                    onClick = { viewModel.jumpToNewest(tab) },
+                    modifier = Modifier.size(40.dp),
+                ) {
                     Icon(
-                        Icons.Rounded.VerticalAlignBottom,
+                        Icons.Rounded.KeyboardDoubleArrowDown,
                         contentDescription = stringResource(R.string.logs_jump_newest),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -790,7 +799,7 @@ private fun LogSettingsSheet(
                             )
                         },
                         trailingContent = {
-                            Switch(checked = enabled, onCheckedChange = { viewModel.setVerbose(it) })
+                            CheckSwitch(checked = enabled, onCheckedChange = { viewModel.setVerbose(it) })
                         },
                         colors = sheetRowColors,
                     ) { Text(stringResource(R.string.logs_verbose_switch)) }

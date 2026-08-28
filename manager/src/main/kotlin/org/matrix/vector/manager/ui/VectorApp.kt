@@ -1,18 +1,36 @@
 package org.matrix.vector.manager.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldState
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldValue
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
-import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -33,6 +51,7 @@ import org.matrix.vector.manager.ui.navigation.Scope
 import org.matrix.vector.manager.ui.navigation.StoreDetail
 import org.matrix.vector.manager.ui.navigation.SystemStatus
 import org.matrix.vector.manager.ui.navigation.TOP_LEVEL_DESTINATIONS
+import org.matrix.vector.manager.ui.navigation.TopLevel
 import org.matrix.vector.manager.ui.navigation.TopLevelRoute
 import org.matrix.vector.manager.ui.navigation.Troubleshoot
 import org.matrix.vector.manager.ui.navigation.VectorFloatingNavSettings
@@ -60,6 +79,135 @@ import org.matrix.vector.ui.navigation.rememberNavigator
 import org.matrix.vector.ui.store.RepoDetailsScreen
 import org.matrix.vector.ui.store.RepoScreen
 
+/** AOSP-native navigation transition duration, in milliseconds. */
+private const val NATIVE_BACK_TRANSITION_MS = 300
+
+/**
+ * AOSP full-screen predictive back is a *fade-through*, not a slide: the current page shrinks to
+ * 90% and fades out while the previous page — which starts a touch larger at 110% — settles to 100%
+ * and fades in. No horizontal travel at all; the half-width slide reads as flipping pages.
+ *
+ * Both specs use `LinearEasing` on purpose. During the gesture the top screen is not yet at its
+ * destination: Navigation 3 *seeks* the transition to the finger's progress
+ * (`SeekableTransitionState.seekTo(progress, ...)`) rather than playing it to completion, so a
+ * curved easing would read as the page lagging the hand — it would not reach the framebuffer the
+ * finger is already at. WeKitThemeGenerator drives the same effect by mapping `backEvent.progress`
+ * straight into a `graphicsLayer` alpha (`1f - progress`); that is linear, 1:1, and is exactly what
+ * the seeked scale/fade needs to match, or the page won't feel like it is being dragged.
+ */
+private val PREDICTIVE_BACK_SCALE_SPEC: FiniteAnimationSpec<Float> =
+    tween(NATIVE_BACK_TRANSITION_MS, easing = LinearEasing)
+
+/** The cross-fade of the previous page during a predictive back gesture. */
+private val PREDICTIVE_BACK_FADE_SPEC: FiniteAnimationSpec<Float> =
+    tween(NATIVE_BACK_TRANSITION_MS, easing = LinearEasing)
+
+/**
+ * The AOSP full-screen back transition, shared by predictive-pop and by the plain pop a system back
+ * button (or a mouse's right-click back) produces.
+ *
+ * Navigation 3 applies it to both directions of a pop: the outgoing screen scales 100%→90% and
+ * fades out while the incoming screen — which started at 110% — settles to 100% and fades in,
+ * crossing at the middle. Both halves use [PREDICTIVE_BACK_SCALE_SPEC]/[PREDICTIVE_BACK_FADE_SPEC],
+ * which are linear, so the two drives read the same: predictive back seeks the transition to the
+ * finger's progress (see the note on those specs), while a button pop plays it to completion on its
+ * own.
+ */
+private fun fadeThroughBackTransition(): ContentTransform {
+    val exit =
+        scaleOut(
+            targetScale = 0.9f,
+            animationSpec = PREDICTIVE_BACK_SCALE_SPEC,
+        ) + fadeOut(animationSpec = PREDICTIVE_BACK_FADE_SPEC)
+    val enter =
+        scaleIn(
+            initialScale = 1.1f,
+            animationSpec = PREDICTIVE_BACK_SCALE_SPEC,
+        ) + fadeIn(animationSpec = PREDICTIVE_BACK_FADE_SPEC)
+    return enter togetherWith exit
+}
+
+/**
+ * A [NavigationSuiteScaffoldState] whose bar is animated with the same motion as the destination
+ * transition, so the bar and the page move as one.
+ *
+ * The scaffold's own `rememberNavigationSuiteScaffoldState` hides/shows the bar with a fixed spring
+ * — crisp, but its own tempo. A back press then animates the bar on a spring while the page it is
+ * attached to fades through on the 300ms linear curve, so the two read as separate motions: the bar
+ * snaps into place while the page is still settling. This replaces the spring with the same
+ * `tween(NATIVE_BACK_TRANSITION_MS, LinearEasing)` the destination transitions use, so the bar
+ * slides/fades in lockstep with the page rather than on its own clock.
+ *
+ * Everything else — [isAnimating], [targetValue], [currentValue], the Saver — mirrors the default
+ * implementation, because the scaffold reads those to lay out and to decide whether to consume
+ * insets. Only the animation spec differs.
+ */
+@Composable
+private fun rememberVectorSuiteState(): NavigationSuiteScaffoldState {
+    return rememberSaveable(saver = rememberVectorSuiteStateSaver()) { VectorSuiteState() }
+}
+
+private fun rememberVectorSuiteStateSaver():
+    Saver<NavigationSuiteScaffoldState, NavigationSuiteScaffoldValue> =
+    Saver(
+        save = { it.targetValue },
+        restore = { VectorSuiteState(initialValue = it) },
+    )
+
+private class VectorSuiteState(
+    initialValue: NavigationSuiteScaffoldValue = NavigationSuiteScaffoldValue.Visible
+) : NavigationSuiteScaffoldState {
+    private val internalValue: Float =
+        if (initialValue == NavigationSuiteScaffoldValue.Visible) VISIBLE else HIDDEN
+    private val internalState = Animatable(internalValue, Float.VectorConverter)
+    private val _currentValue = derivedStateOf {
+        if (internalState.value == VISIBLE) NavigationSuiteScaffoldValue.Visible
+        else NavigationSuiteScaffoldValue.Hidden
+    }
+
+    /** The same curve as the destination fade-through, so the bar tracks the page. */
+    private val spec: FiniteAnimationSpec<Float> =
+        tween(NATIVE_BACK_TRANSITION_MS, easing = LinearEasing)
+
+    override val isAnimating: Boolean
+        get() = internalState.isRunning
+
+    override val targetValue: NavigationSuiteScaffoldValue
+        get() =
+            if (internalState.targetValue == VISIBLE) NavigationSuiteScaffoldValue.Visible
+            else NavigationSuiteScaffoldValue.Hidden
+
+    override val currentValue: NavigationSuiteScaffoldValue
+        get() = _currentValue.value
+
+    override suspend fun hide() {
+        internalState.animateTo(targetValue = HIDDEN, animationSpec = spec)
+    }
+
+    override suspend fun show() {
+        internalState.animateTo(targetValue = VISIBLE, animationSpec = spec)
+    }
+
+    override suspend fun toggle() {
+        internalState.animateTo(
+            targetValue =
+                if (targetValue == NavigationSuiteScaffoldValue.Visible) HIDDEN else VISIBLE,
+            animationSpec = spec,
+        )
+    }
+
+    override suspend fun snapTo(targetValue: NavigationSuiteScaffoldValue) {
+        internalState.snapTo(
+            if (targetValue == NavigationSuiteScaffoldValue.Visible) VISIBLE else HIDDEN
+        )
+    }
+
+    private companion object {
+        const val HIDDEN = 0f
+        const val VISIBLE = 1f
+    }
+}
+
 /**
  * The app shell.
  *
@@ -76,7 +224,7 @@ import org.matrix.vector.ui.store.RepoScreen
  */
 @Composable
 fun VectorApp() {
-    val navigator = rememberNavigator(VectorNavPanelStore, TOP_LEVEL_DESTINATIONS)
+    val navigator = rememberNavigator(VectorNavPanelStore, TOP_LEVEL_DESTINATIONS, TopLevel)
 
     // Where the launch intent asked to open. The activity has no back stack to act on, so it leaves
     // the destination here and this is the first place there is one — on a cold start the splash is
@@ -112,7 +260,7 @@ fun VectorApp() {
         // Driving the scaffold's own state rather than dropping the items: hiding the items alone
         // leaves the container laid out, so a detail screen — the in-app browser especially —
         // keeps a dead strip of navigation-bar-sized space at the bottom.
-        val suiteState = rememberNavigationSuiteScaffoldState()
+        val suiteState = rememberVectorSuiteState()
         LaunchedEffect(atRoot) { if (atRoot) suiteState.show() else suiteState.hide() }
 
         // Computed rather than left to the scaffold's default, for two reasons: the floating style
@@ -148,21 +296,48 @@ fun VectorApp() {
             },
         ) {
             Box(Modifier.fillMaxSize()) {
+                // One NavDisplay owns the whole stack. The root is the fixed TopLevel container,
+                // which renders the finger-following pager of panels; a detail (scope editor, store
+                // detail, browser…) is a second entry pushed above it by Navigator.go. Because the
+                // display stays mounted instead of being swapped for a separate pager branch, a
+                // system back press / mouse right-click pops the detail and plays the
+                // popTransitionSpec fade-through — the previous page shows behind the shrinking
+                // current one — rather than the whole thing vanishing the instant the stack is back
+                // to the root.
                 NavDisplay(
                     backStack = navigator.backStack,
                     onBack = { navigator.back() },
                     // Naming any decorator replaces NavDisplay's default, which is the
-                    // saveable-state one alone, so it is repeated here; the scene-setup decorator
-                    // NavDisplay applies internally is untouched. The ViewModel one is what this
-                    // list is for: it scopes a ViewModelStore per entry, so opening the scope
-                    // editor for a second module builds a second ViewModel instead of reusing the
-                    // first (they would otherwise share one default key under the activity's
-                    // store).
+                    // saveable-state one alone, so it is repeated here; the scene-setup
+                    // decorator NavDisplay applies internally is untouched. The ViewModel one
+                    // is what this list is for: it scopes a ViewModelStore per entry, so
+                    // opening the scope editor for a second module builds a second ViewModel
+                    // instead of reusing the first (they would otherwise share one default key
+                    // under the activity's store).
                     entryDecorators =
                         listOf(
                             rememberSaveableStateHolderNavEntryDecorator(),
                             rememberViewModelStoreNavEntryDecorator(),
                         ),
+                    // Forward is the mirror of back, so it uses the same AOSP fade-through: the
+                    // new page shrinks in from 110% and fades in while the page it covers shrinks
+                    // to 90% and fades out. Push and pop are therefore one symmetric motion rather
+                    // than opposite ones (the official sample's half-width slide is not used here,
+                    // because a slide forward plus a fade-through back would feel like two
+                    // different navigations).
+                    transitionSpec = { fadeThroughBackTransition() },
+                    popTransitionSpec = { fadeThroughBackTransition() },
+                    predictivePopTransitionSpec = { _ ->
+                        // AOSP full-screen predictive back, symmetric: the swipe edge is unused
+                        // so the gesture reads the same from either side.
+                        // `fadeThroughBackTransition`
+                        // is shared with the plain button pop above, so a back-key press and a back
+                        // drag land the reader in the same place — the previous page revealed
+                        // behind
+                        // the shrinking current one, the one difference being that the gesture
+                        // tracks the finger 1:1 via seekTo(progress).
+                        fadeThroughBackTransition()
+                    },
                     entryProvider = entryProvider { registerRoutes(navigator) },
                 )
                 // Last child of the Box so it draws over the destination, and inside the app window
@@ -195,33 +370,103 @@ fun VectorApp() {
  * its keys by class, and entryProvider throws for one it was never given, so dropping the
  * registration of a hidden panel would turn a stale saved stack into a crash.
  */
+
+/**
+ * The root of the stack: the top-level panels as a finger-following pager, in the reader's own
+ * order.
+ *
+ * The pager owns the gesture; the navigator owns the truth. A swipe that settles on a page turns
+ * that panel into the current one, and whatever else moves the navigator (a bar tap, a deep link, a
+ * restored stack) drives the pager to the matching page. The two effects below are the only links,
+ * and each guards itself so a change it itself caused does not recurse.
+ *
+ * A detail is never drawn here: it is pushed *above* this entry by [Navigator.go], and NavDisplay
+ * keeps this entry mounted underneath it, so backing out of the detail reveals this pager (and the
+ * panel you were on) instead of remounting it. Both directions are what let the pager's own scroll
+ * position and each panel's ViewModel survive a detail round-trip.
+ */
+@Composable
+private fun TopLevelContainer(navigator: Navigator) {
+    val visible = navigator.panels.visible
+    // Seed the pager at the panel the reader is actually on. [rememberPagerState] reads this on
+    // first composition only; when the TopLevel entry is remounted after process death it starts
+    // at the panel the reader was on rather than at page zero.
+    val initialPage =
+        visible.indexOfFirst { it.route == navigator.currentTopLevel }.coerceAtLeast(0)
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { visible.size })
+    // The navigator is the authority: wherever the current panel changed, page to it.
+    LaunchedEffect(navigator.currentTopLevel, visible) {
+        val page = visible.indexOfFirst { it.route == navigator.currentTopLevel }
+        if (page >= 0 && page != pagerState.currentPage) {
+            pagerState.animateScrollToPage(page)
+        }
+    }
+    // The gesture is the authority: once a swipe settles, make that panel current. switchTo clears
+    // the stack back to the root, so a swipe never leaves a stale detail buried under a new tab.
+    LaunchedEffect(pagerState, visible, navigator) {
+        snapshotFlow { pagerState.settledPage }
+            .collect { page ->
+                val target = visible.getOrNull(page)?.route ?: return@collect
+                if (navigator.currentTopLevel != target) navigator.switchTo(target)
+            }
+    }
+    HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxSize(),
+    ) { page ->
+        // Every panel in the catalogue routes to a TopLevelRoute; the downcast is how the NavKey
+        // carried by TopLevelDestination becomes one here.
+        val route = visible.getOrNull(page)?.route as? TopLevelRoute ?: return@HorizontalPager
+        Box(Modifier.fillMaxSize()) { TopLevelPanelContent(route, navigator) }
+    }
+}
+
+/**
+ * The four top-level panels, composed for a given route.
+ *
+ * The pager draws one page per visible panel, in the reader's own order; the fixed [TopLevel] root
+ * stores that pager in the back stack, so a detail pushed above it does not disturb which panel is
+ * on display. A panel's wiring — what a tap on a row opens, which service supplies the data — has
+ * one home here rather than copies at every place that might draw it.
+ */
+@Composable
+private fun TopLevelPanelContent(route: TopLevelRoute, navigator: Navigator) {
+    when (route) {
+        TopLevelRoute.Home ->
+            HomeScreen(
+                onOpenStatus = { navigator.go(SystemStatus) },
+                onOpenUrl = { url -> navigator.go(Web(url)) },
+                onOpenCanary = { navigator.go(Canary) },
+                onOpenReport = { navigator.go(Troubleshoot) },
+                onOpenUpdate = { navigator.go(FrameworkUpdate()) },
+            )
+
+        TopLevelRoute.Modules ->
+            ModulesScreen(
+                onModuleClick = { packageName, userId -> navigator.go(Scope(packageName, userId)) },
+                onOpenStore = { packageName -> navigator.go(StoreDetail(packageName)) },
+            )
+
+        TopLevelRoute.Store ->
+            RepoScreen(
+                onModuleClick = { packageName -> navigator.go(StoreDetail(packageName)) },
+                dataSource = ServiceLocator.store,
+                settings = ServiceLocator.settings,
+            )
+
+        TopLevelRoute.Logs -> {
+            val logSource = remember { VectorLogSource() }
+            LogsScreen(source = logSource, onOpenTrace = { text -> navigator.go(LogTrace(text)) })
+        }
+    }
+}
+
 private fun EntryProviderScope<NavKey>.registerRoutes(navigator: Navigator) {
-    entry<TopLevelRoute.Home> {
-        HomeScreen(
-            onOpenStatus = { navigator.go(SystemStatus) },
-            onOpenUrl = { url -> navigator.go(Web(url)) },
-            onOpenCanary = { navigator.go(Canary) },
-            onOpenReport = { navigator.go(Troubleshoot) },
-            onOpenUpdate = { navigator.go(FrameworkUpdate()) },
-        )
-    }
-    entry<TopLevelRoute.Modules> {
-        ModulesScreen(
-            onModuleClick = { packageName, userId -> navigator.go(Scope(packageName, userId)) },
-            onOpenStore = { packageName -> navigator.go(StoreDetail(packageName)) },
-        )
-    }
-    entry<TopLevelRoute.Store> {
-        RepoScreen(
-            onModuleClick = { packageName -> navigator.go(StoreDetail(packageName)) },
-            dataSource = ServiceLocator.store,
-            settings = ServiceLocator.settings,
-        )
-    }
-    entry<TopLevelRoute.Logs> {
-        val logSource = remember { VectorLogSource() }
-        LogsScreen(source = logSource, onOpenTrace = { text -> navigator.go(LogTrace(text)) })
-    }
+    // The stack's only ever-present entry: the pager of panels. A detail is pushed above it. The
+    // four TopLevelRoute entries are not registered as destinations — the pager draws each panel's
+    // content directly, so the stack never contains a TopLevelRoute and entryProvider never has to
+    // construct one for a saved stack.
+    entry<TopLevel> { TopLevelContainer(navigator) }
 
     entry<Scope> { route ->
         ScopeScreen(

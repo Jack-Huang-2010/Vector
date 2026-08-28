@@ -10,6 +10,7 @@ import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.RestartAlt
 import android.text.format.Formatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -434,17 +435,29 @@ private fun InstallBar(
                             } ?: stringResource(UiR.string.store_install_failed, install.packageName),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
                     )
                     Spacer(Modifier.height(4.dp))
-                    // The same body as the resting button below, because this is the same press:
-                    // clearing the failure on its own would only put the Install button back and
-                    // leave the reader to press it again, which is a retry that retries nothing.
-                    TextButton(
+                    // The same press as the resting install button below, and the same look: this is
+                    // the same action, not a separate affordance, and clearing the failure on its own
+                    // would only put the Install button back and leave the reader to press it again,
+                    // which is a retry that retries nothing. The icon is a curved restart loop, the
+                    // standard "try again" gesture, where the download arrow would only repeat the
+                    // failure that just happened.
+                    Button(
                         onClick = {
                             onAcknowledge()
                             onInstall(newest)
-                        }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
+                        Icon(
+                            Icons.Rounded.RestartAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
                         Text(stringResource(UiR.string.retry))
                     }
                 }

@@ -1,4 +1,5 @@
 package org.matrix.vector.manager.ui.screens.modules
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -14,15 +15,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.matrix.vector.ipc.ScopeEntry
 import org.matrix.vector.manager.data.model.AppInfo
-import org.matrix.vector.ui.module.ModuleDetection
-import org.matrix.vector.ui.module.RecommendedScope
 import org.matrix.vector.manager.data.repository.AppRepository
 import org.matrix.vector.manager.data.repository.ModuleRepository
-import org.matrix.vector.manager.di.ServiceLocator
 import org.matrix.vector.manager.data.repository.SettingsRepository
+import org.matrix.vector.manager.di.ServiceLocator
 import org.matrix.vector.manager.ipc.DaemonClient
 import org.matrix.vector.manager.logE
 import org.matrix.vector.manager.logW
+import org.matrix.vector.ui.module.ModuleDetection
+import org.matrix.vector.ui.module.RecommendedScope
 
 /**
  * A package/user pair, as a value type so set arithmetic is correct.
@@ -60,8 +61,8 @@ data class ScopeUiState(
      * Whether this device has more than one user at all.
      *
      * The framework row explains that it is shared across users, which is only ever news on a
-     * device that has more than one. On a single-user phone — most of them — it is a sentence
-     * about a distinction that does not exist, so it is not shown.
+     * device that has more than one. On a single-user phone — most of them — it is a sentence about
+     * a distinction that does not exist, so it is not shown.
      */
     val multipleUsers: Boolean = false,
     /**
@@ -69,9 +70,9 @@ data class ScopeUiState(
      *
      * A legacy module reports being active by hooking a method in its own app, so it has to be in
      * its own scope before it can say anything at all, and the daemon derives that one target
-     * rather than storing it. Nothing comes back from `getModuleScope` to say so — so without
-     * this, the one row the module certainly hooks is the one row shown unticked, and with the
-     * module filter at its default it is not shown at all.
+     * rather than storing it. Nothing comes back from `getModuleScope` to say so — so without this,
+     * the one row the module certainly hooks is the one row shown unticked, and with the module
+     * filter at its default it is not shown at all.
      */
     val selfHooked: Boolean = false,
 )
@@ -83,9 +84,9 @@ class ScopeViewModel(
      *
      * Not a second scope. A module is one package and one APK for the whole device and has one
      * scope set; what varies per user is which apps exist to point at, and the daemon will not
-     * expand a row for a user that does not hold the module. So this selects the half of the
-     * device being edited — [apply] merges into the whole stored set rather than replacing it,
-     * which is what leaves another user's rows alone.
+     * expand a row for a user that does not hold the module. So this selects the half of the device
+     * being edited — [apply] merges into the whole stored set rather than replacing it, which is
+     * what leaves another user's rows alone.
      */
     private val userId: Int,
     private val daemonClient: DaemonClient,
@@ -110,9 +111,9 @@ class ScopeViewModel(
      * What the user has built up but not yet applied.
      *
      * Writing a scope is not incremental — the daemon deletes every scope row of the module and
-     * writes the new set in one transaction, then asks for a configuration rebuild. Sending that
-     * on every checkbox tap means ten rewrites and ten rebuilds to tick ten apps, so edits
-     * accumulate here and go out as one write.
+     * writes the new set in one transaction, then asks for a configuration rebuild. Sending that on
+     * every checkbox tap means ten rewrites and ten rebuilds to tick ten apps, so edits accumulate
+     * here and go out as one write.
      */
     private val draftScope = MutableStateFlow<Set<ScopeTarget>>(emptySet())
 
@@ -125,10 +126,10 @@ class ScopeViewModel(
      * out of the list, so only unticking has anything to record here.
      *
      * Only the list's own filters read it, and only to keep a row present. Unticking is an edit
-     * like any other and the row has to survive it — an app that vanishes the moment it is
-     * unticked cannot be re-ticked, so a slip becomes permanent for as long as the reader does not
-     * think to go and turn a filter on. It never shrinks: a row put in play stays in play until
-     * the screen is left, which is the point.
+     * like any other and the row has to survive it — an app that vanishes the moment it is unticked
+     * cannot be re-ticked, so a slip becomes permanent for as long as the reader does not think to
+     * go and turn a filter on. It never shrinks: a row put in play stays in play until the screen
+     * is left, which is the point.
      *
      * Which is also why nothing may go in that was not really changed. A row the reader merely
      * *saw* would be exempted from the system, game and module filters for the rest of the visit,
@@ -170,9 +171,9 @@ class ScopeViewModel(
     /**
      * Whether other Xposed modules appear in the list.
      *
-     * They are installed apps like any other and a module *can* legitimately hook one, but that
-     * is rare enough that the default is off: on a device with two dozen modules, listing them
-     * all among the hookable apps is two dozen rows of noise for one plausible use.
+     * They are installed apps like any other and a module *can* legitimately hook one, but that is
+     * rare enough that the default is off: on a device with two dozen modules, listing them all
+     * among the hookable apps is two dozen rows of noise for one plausible use.
      */
     val showModules = MutableStateFlow(settings.scopeShowModules.value)
 
@@ -187,8 +188,8 @@ class ScopeViewModel(
      * Whether this module has a screen to open at all.
      *
      * Null until asked, so the control does not flicker into existence on arrival. Most modules
-     * have no companion and no launcher entry, and offering to open one is offering nothing —
-     * which is why this is worth a lookup rather than a snackbar after the fact.
+     * have no companion and no launcher entry, and offering to open one is offering nothing — which
+     * is why this is worth a lookup rather than a snackbar after the fact.
      *
      * Declared above [init] rather than beside the function that fills it, and it has to stay
      * there. `viewModelScope` dispatches on `Main.immediate`, so [findCompanion] starts inline on
@@ -203,9 +204,7 @@ class ScopeViewModel(
         // Written back as they change rather than on the way out: this screen is left by a back
         // gesture, by the process being killed, and by the host application deciding it is done —
         // and only the first of those runs any teardown of ours.
-        viewModelScope.launch {
-            showSystemApps.collect { settings.setScopeShowSystemApps(it) }
-        }
+        viewModelScope.launch { showSystemApps.collect { settings.setScopeShowSystemApps(it) } }
         viewModelScope.launch { showGames.collect { settings.setScopeShowGames(it) } }
         viewModelScope.launch { showModules.collect { settings.setScopeShowModules(it) } }
         viewModelScope.launch { sort.collect { settings.setScopeSort(it.name.lowercase()) } }
@@ -227,7 +226,9 @@ class ScopeViewModel(
     private val _message = MutableStateFlow<ScopeMessage?>(null)
     val message: StateFlow<ScopeMessage?> = _message.asStateFlow()
 
-    /** Added and removed relative to what the daemon holds, so the UI can say what Apply will do. */
+    /**
+     * Added and removed relative to what the daemon holds, so the UI can say what Apply will do.
+     */
     val pendingChanges: StateFlow<PendingChanges> =
         combine(savedScope, draftScope) { saved, draft ->
                 PendingChanges(
@@ -236,6 +237,22 @@ class ScopeViewModel(
                 )
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PendingChanges())
+
+    /**
+     * Whether leaving would leave the module enabled with nothing to hook — the state that makes
+     * the back gesture ask a question before leaving instead of fading out to the previous page.
+     *
+     * This is [wouldStrandModule] as an observable flow so the screen can decide *before the
+     * gesture starts* whether to let Navigation 3 play the predictive-back animation (which needs
+     * the gesture, and therefore reveals the previous page behind this one) or to intercept it and
+     * show the confirm dialog instead. Recomputed live: ticking a target in the list clears the
+     * warning even though the module was stranded the moment it opened.
+     */
+    val wouldStrand: StateFlow<Boolean> =
+        combine(_uiState, draftScope, savedScope) { ui, draft, saved ->
+                ui.isEnabled && draft.isEmpty() && saved.isEmpty()
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), wouldStrandModule())
 
     val filteredApps: StateFlow<List<AppInfo>> =
         combine(allApps, draftScope, searchQuery, showSystemApps, showGames) {
@@ -264,6 +281,15 @@ class ScopeViewModel(
                     View(showMods, modules, order, reverse, state)
                 }
             ) { filters, view ->
+                // While the load is running the list must not be published: the app list arrives
+                // before the saved scope and the module's recommended scope, so publishing the
+                // unfiltered list for even one frame makes a fixed-scope module flash every app
+                // before settling on the few it may hook. `loading` is in the same _uiState that
+                // carries the recommended scope, so gating on it holds the list empty until the
+                // whole load lands and the first list shown is the correct one. (The UI shows a
+                // spinner for this same flag, so the empty list here is never drawn as an empty
+                // state.)
+                if (view.state.loading) return@combine emptyList()
                 val showMods = view.showModules
                 val modules = view.modulePackages
                 val order = view.sort
@@ -397,7 +423,8 @@ class ScopeViewModel(
                     }
             }
             // Filtering and sorting the full installed-app list is real work — often thousands of
-            // entries — and stateIn(viewModelScope) alone would run it on Dispatchers.Main.immediate
+            // entries — and stateIn(viewModelScope) alone would run it on
+            // Dispatchers.Main.immediate
             // on every keystroke.
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -503,11 +530,11 @@ class ScopeViewModel(
                 val info =
                     withContext(Dispatchers.IO) {
                         runCatching {
-                                packageManager.getApplicationInfo(
-                                    modulePackageName,
-                                    android.content.pm.PackageManager.GET_META_DATA,
-                                )
-                            }
+                            packageManager.getApplicationInfo(
+                                modulePackageName,
+                                android.content.pm.PackageManager.GET_META_DATA,
+                            )
+                        }
                             .onFailure { e ->
                                 logW(
                                     "scope: package info for $modulePackageName (user $userId) " +
@@ -520,25 +547,24 @@ class ScopeViewModel(
                 // One inspection, two answers: what the module asks to hook, and which generation
                 // of module it is. Both come out of the same pass over the APK, and opening it is
                 // the expensive part.
-                val manifest =
-                    info?.let {
-                        withContext(Dispatchers.IO) {
-                            // Guarded like the package info above it, and for the same reason: this
-                            // opens the module's APK, so a package removed or replaced between that
-                            // lookup and this one throws here. Recovering as "no recommended scope"
-                            // costs the reader a few pre-ticked rows; letting it out of a
-                            // `viewModelScope` coroutine takes the whole manager down.
-                            runCatching { ModuleDetection.inspect(it, packageManager) }
-                                .onFailure { e ->
-                                    logW(
-                                        "scope: reading the manifest of $modulePackageName " +
-                                            "failed, no recommended scope",
-                                        e,
-                                    )
-                                }
-                                .getOrNull()
-                        }
+                val manifest = info?.let {
+                    withContext(Dispatchers.IO) {
+                        // Guarded like the package info above it, and for the same reason: this
+                        // opens the module's APK, so a package removed or replaced between that
+                        // lookup and this one throws here. Recovering as "no recommended scope"
+                        // costs the reader a few pre-ticked rows; letting it out of a
+                        // `viewModelScope` coroutine takes the whole manager down.
+                        runCatching { ModuleDetection.inspect(it, packageManager) }
+                            .onFailure { e ->
+                                logW(
+                                    "scope: reading the manifest of $modulePackageName " +
+                                        "failed, no recommended scope",
+                                    e,
+                                )
+                            }
+                            .getOrNull()
                     }
+                }
                 val recommended =
                     manifest?.let { RecommendedScope(it.scope, it.staticScope) }
                         ?: RecommendedScope.NONE
@@ -602,11 +628,11 @@ class ScopeViewModel(
      * Re-reads the stored scope and folds whatever arrived from elsewhere into the draft.
      *
      * Called every time the screen comes back to the front, because this editor is not the only
-     * writer of that table and the other writer is one tap away: the button in the corner opens
-     * the module, a libxposed module asks for a target while it runs, and the user approves it
-     * from the notification shade. Nothing here would ever notice — the load runs once, from
-     * `init` — so the list would go on drawing an empty box beside a target the module is already
-     * being loaded into, and the apply bar would count a removal nobody asked for.
+     * writer of that table and the other writer is one tap away: the button in the corner opens the
+     * module, a libxposed module asks for a target while it runs, and the user approves it from the
+     * notification shade. Nothing here would ever notice — the load runs once, from `init` — so the
+     * list would go on drawing an empty box beside a target the module is already being loaded
+     * into, and the apply bar would count a removal nobody asked for.
      *
      * Additive on purpose. What the user has ticked here is theirs and survives untouched; a row
      * that appeared outside joins both the baseline and the draft, so it reads as in force rather
@@ -660,8 +686,7 @@ class ScopeViewModel(
         val target = ScopeTarget(app.packageName, app.userId)
         // Before the draft changes, so the row cannot be filtered out by the very edit being made.
         touched.value = touched.value + target
-        draftScope.value =
-            if (selected) draftScope.value + target else draftScope.value - target
+        draftScope.value = if (selected) draftScope.value + target else draftScope.value - target
     }
 
     // Both skip the derived row for the reason [toggle] gives: it is shown among the visible rows
@@ -739,7 +764,7 @@ class ScopeViewModel(
                     } else {
                         logE(
                             "scope: daemon refused include-new-apps=$enabled for " +
-                                modulePackageName,
+                                modulePackageName
                         )
                         _message.value = ScopeMessage.IncludeNewAppsFailed
                     }
@@ -854,8 +879,8 @@ class ScopeViewModel(
      * reduces the expression below to exactly the draft, which is the behaviour this replaces, and
      * refusing to apply at all would leave an edit that can never be committed.
      *
-     * One write means one configuration rebuild. The new scope reaches an app when its process
-     * next starts; nothing running is restarted here.
+     * One write means one configuration rebuild. The new scope reaches an app when its process next
+     * starts; nothing running is restarted here.
      *
      * The daemon enables the module as a side effect of storing a scope.
      */
@@ -876,13 +901,12 @@ class ScopeViewModel(
             }
             val before = current ?: baseline
             val merged = before + (draft - baseline) - (baseline - draft)
-            val aidl =
-                merged.map { target ->
-                    ScopeEntry().apply {
-                        packageName = target.packageName
-                        userId = target.userId
-                    }
+            val aidl = merged.map { target ->
+                ScopeEntry().apply {
+                    packageName = target.packageName
+                    userId = target.userId
                 }
+            }
             daemonClient
                 .setModuleScope(modulePackageName, aidl)
                 .onSuccess { stored ->
@@ -948,25 +972,23 @@ class ScopeViewModel(
     /**
      * This one module's scope, as plain JSON.
      *
-     * Not gzipped like the whole-list backup: a single scope is small, and a readable file is
-     * worth more here — it is the kind of thing someone hand-edits or pastes into an issue.
+     * Not gzipped like the whole-list backup: a single scope is small, and a readable file is worth
+     * more here — it is the kind of thing someone hand-edits or pastes into an issue.
      */
     fun backupScopeTo(uri: android.net.Uri, onDone: (Boolean) -> Unit) {
         viewModelScope.launch {
             val ok =
                 withContext(Dispatchers.IO) {
                     runCatching {
-                            val payload =
-                                draftScope.value.joinToString(",\n  ") {
-                                    """{"packageName":"${it.packageName}","userId":${it.userId}}"""
-                                }
-                            ServiceLocator.context.contentResolver.openOutputStream(uri)?.use {
-                                it.write("[\n  $payload\n]".toByteArray())
-                            } ?: error("could not open the file")
-                        }
-                        .onFailure { e ->
-                            logE("scope: backup of $modulePackageName failed", e)
-                        }
+                        val payload =
+                            draftScope.value.joinToString(",\n  ") {
+                                """{"packageName":"${it.packageName}","userId":${it.userId}}"""
+                            }
+                        ServiceLocator.context.contentResolver.openOutputStream(uri)?.use {
+                            it.write("[\n  $payload\n]".toByteArray())
+                        } ?: error("could not open the file")
+                    }
+                        .onFailure { e -> logE("scope: backup of $modulePackageName failed", e) }
                         .isSuccess
                 }
             onDone(ok)
@@ -978,15 +1000,15 @@ class ScopeViewModel(
             val targets =
                 withContext(Dispatchers.IO) {
                     runCatching {
-                            val text =
-                                ServiceLocator.context.contentResolver.openInputStream(uri)?.use {
-                                    it.readBytes().decodeToString()
-                                } ?: error("could not open the file")
-                            Regex("\"packageName\"\\s*:\\s*\"([^\"]+)\"[^}]*?\"userId\"\\s*:\\s*(\\d+)")
-                                .findAll(text)
-                                .map { ScopeTarget(it.groupValues[1], it.groupValues[2].toInt()) }
-                                .toSet()
-                        }
+                        val text =
+                            ServiceLocator.context.contentResolver.openInputStream(uri)?.use {
+                                it.readBytes().decodeToString()
+                            } ?: error("could not open the file")
+                        Regex("\"packageName\"\\s*:\\s*\"([^\"]+)\"[^}]*?\"userId\"\\s*:\\s*(\\d+)")
+                            .findAll(text)
+                            .map { ScopeTarget(it.groupValues[1], it.groupValues[2].toInt()) }
+                            .toSet()
+                    }
                         .onFailure { e ->
                             if (e is CancellationException) throw e
                             logE("scope: restore for $modulePackageName failed", e)
@@ -1022,8 +1044,8 @@ class ScopeViewModel(
         /**
          * What to *show* for it, which is not what it is stored as.
          *
-         * The scope table has said `system` since long before this manager, and the daemon, the
-         * CLI and every backup file on every device say it too — so the stored name stays. But the
+         * The scope table has said `system` since long before this manager, and the daemon, the CLI
+         * and every backup file on every device say it too — so the stored name stays. But the
          * process it actually means is `system_server`, and a reader looking at a package name
          * expects the name of the thing. The rename lives here, at the point of display, and
          * nothing written back to the daemon ever passes through it.
@@ -1034,6 +1056,7 @@ class ScopeViewModel(
         fun displayPackageName(packageName: String): String =
             if (packageName == SYSTEM_FRAMEWORK_PACKAGE) SYSTEM_FRAMEWORK_DISPLAY_NAME
             else packageName
+
         const val FRAMEWORK_LABEL = "System Framework"
     }
 }

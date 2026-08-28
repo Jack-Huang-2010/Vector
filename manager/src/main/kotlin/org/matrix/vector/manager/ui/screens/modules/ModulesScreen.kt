@@ -30,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.SettingsBackupRestore
 import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Close
@@ -39,11 +38,17 @@ import androidx.compose.material.icons.rounded.Android
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.SaveAlt
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Check
+import com.composables.icons.materialsymbols.outlined.Filter_list
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -115,7 +120,7 @@ import org.matrix.vector.ui.R as UiR
 import org.matrix.vector.manager.data.model.InstalledModule
 import org.matrix.vector.manager.di.ServiceLocator
 import org.matrix.vector.ui.AppIcon
-import org.matrix.vector.manager.ui.components.PackageActionSheet
+import org.matrix.vector.manager.ui.components.ModuleActionMenuItems
 import org.matrix.vector.ui.SnackbarTone
 import org.matrix.vector.ui.SharedSnackbarHost
 import org.matrix.vector.ui.show
@@ -582,6 +587,7 @@ private fun ModulesSearch(
 }
 
 /** The filter menu that lives in the search field's trailing slot. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ModuleFilterButton(
     filter: ModuleFilter,
@@ -602,7 +608,7 @@ private fun ModuleFilterButton(
                 }
             ) {
                 Icon(
-                    Icons.Rounded.FilterList,
+                    MaterialSymbols.Outlined.Filter_list,
                     contentDescription = stringResource(R.string.modules_filter),
                     tint =
                         if (filtering) MaterialTheme.colorScheme.primary
@@ -610,36 +616,62 @@ private fun ModuleFilterButton(
                 )
             }
         }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-LocalizedOverlay {
-
-            ModuleFilter.entries.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(option.labelRes())) },
-                    trailingIcon = {
-                        if (option == filter) Icon(Icons.Rounded.Check, contentDescription = null)
-                    },
-                    onClick = {
-                        onFilterChange(option)
-                        menuOpen = false
-                    },
-                )
-            }
-            HorizontalDivider()
-            ModuleSort.entries.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(option.labelRes())) },
-                    trailingIcon = {
-                        if (option == sort) Icon(Icons.Rounded.Check, contentDescription = null)
-                    },
-                    onClick = {
-                        onSortChange(option)
-                        menuOpen = false
-                    },
-                )
+        // The same grouped Material 3 Expressive dropdown that PackageActionMenuItems uses: a
+        // `DropdownMenuPopup` (the popup primitive below `DropdownMenu`) holding two `DropdownMenuGroup`s
+        // — one for the filter, one for the sort — so each item adopts the capsule shape from
+        // `MenuDefaults.itemShape(index, size)` and the selected one gets the checkmark. This is what
+        // WeKit's `DropDownMenuWidget` does and is why the menu items read as pills rather than flat rows.
+        DropdownMenuPopup(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            LocalizedOverlay {
+                DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
+                    ModuleFilter.entries.forEachIndexed { index, option ->
+                        DropdownMenuItem(
+                            selected = option == filter,
+                            onClick = {
+                                onFilterChange(option)
+                                menuOpen = false
+                            },
+                            text = { Text(stringResource(option.labelRes())) },
+                            shapes = MenuDefaults.itemShape(index, ModuleFilter.entries.size),
+                            // The KSU-style state mark: a check in the trailing slot when this is
+                            // the active filter, nothing otherwise. The selectable colors already
+                            // tint the selected item; the check makes the choice explicit.
+                            trailingContent = {
+                                if (option == filter) {
+                                    Icon(
+                                        MaterialSymbols.Outlined.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
+                DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
+                    ModuleSort.entries.forEachIndexed { index, option ->
+                        DropdownMenuItem(
+                            selected = option == sort,
+                            onClick = {
+                                onSortChange(option)
+                                menuOpen = false
+                            },
+                            text = { Text(stringResource(option.labelRes())) },
+                            shapes = MenuDefaults.itemShape(index, ModuleSort.entries.size),
+                            trailingContent = {
+                                if (option == sort) {
+                                    Icon(
+                                        MaterialSymbols.Outlined.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
             }
         }
-}
     }
 }
 
@@ -956,34 +988,37 @@ private fun ModuleListItem(
     var menuOpen by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
 
-    ModuleRow(
-        module = module,
-        facts = facts,
-        hasUpdate = hasUpdate,
-        selected = selected,
-        onOpenStore = onOpenStore,
-        // Once anything is selected the whole row joins the selection, because that is what every
-        // other list on the platform does and aiming at a 48dp icon to add the ninth module would
-        // be its own small ordeal.
-        onClick = if (selectionActive) onSelect else onClick,
-        onIconClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-            onSelect()
-        },
-        onLongClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
-            menuOpen = true
-        },
-    )
+    // The menu must live in the same Box as the row it belongs to: a `DropdownMenuPopup` anchors to
+    // the layout node it is declared in, so composing it as a sibling of the ModuleRow is what opens
+    // the menu beside this row rather than a bottom sheet.
+    Box {
+        ModuleRow(
+            module = module,
+            facts = facts,
+            hasUpdate = hasUpdate,
+            selected = selected,
+            onOpenStore = onOpenStore,
+            // Once anything is selected the whole row joins the selection, because that is what every
+            // other list on the platform does and aiming at a 48dp icon to add the ninth module would
+            // be its own small ordeal.
+            onClick = if (selectionActive) onSelect else onClick,
+            onIconClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                onSelect()
+            },
+            onLongClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                menuOpen = true
+            },
+        )
 
-    if (menuOpen) {
-        PackageActionSheet(
+        ModuleActionMenuItems(
+            expanded = menuOpen,
+            onDismiss = { menuOpen = false },
             packageName = module.packageName,
             userId = module.userId,
             appName = module.appName,
             applicationInfo = module.applicationInfo,
-            isModule = true,
-            onDismiss = { menuOpen = false },
             onResult = onAction,
             onOpenStore = { onOpenStore() },
         )
