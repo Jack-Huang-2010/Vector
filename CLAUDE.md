@@ -235,6 +235,13 @@ behaviors are subtle enough that they have already cost real bugs; keep these in
     bottom-sheet toggle row (e.g. "ignore updates" in `PackageActionMenu.kt` → `ActionToggleRow`),
     present the state as a trailing `MaterialSymbols.Outlined.Check` when enabled and nothing when
     disabled — keep the screen-reader `Role.Switch` via `Modifier.toggleable`.
+  - **The menu group corner radius must be set explicitly to `RoundedCornerShape(16.dp)`.** WeKit
+    (material3 `1.5.0-alpha19`) defaults `DropdownMenuGroup`'s container shape to
+    `SegmentedMenuTokens.ContainerShape` = `CornerLarge` = 16dp. Vector is pinned on `1.5.0-alpha26`,
+    which re-tokens that container to `CornerExtraSmall` (4dp) — so the plain `MenuDefaults.groupShapes()`
+    would render a near-square menu. To match WeKit, pass
+    `MenuDefaults.groupShapes(shape = RoundedCornerShape(16.dp), inactiveShape = RoundedCornerShape(16.dp))`
+    (items keep `MenuDefaults.itemShape(index, size)`). This is the exact WeKit value, not a guess.
   - Long-pressing a module in the **Modules** list (and an app in the scope list) now opens the same
     grouped capsule menu beside the row, via `ModuleActionMenuItems` / `PackageActionMenuItems`
     (`PackageActionDropdown.kt`). The reader anchors both to the pressed row because the caller

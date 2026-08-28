@@ -623,7 +623,18 @@ private fun ModuleFilterButton(
         // WeKit's `DropDownMenuWidget` does and is why the menu items read as pills rather than flat rows.
         DropdownMenuPopup(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             LocalizedOverlay {
-                DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
+                // Two separate groups with a real gap between them — the M3 grouped menu and what the
+                // official sample shows as a blank section break. `Spacer(GroupSpacing)` produces
+                // the gap; no divider. The outer corners stay a large capsule, but the corners that
+                // face the gap (bottom of the first group, top of the second) are small, so the two
+                // capsules don't read as a fat pill against a sliver of background.
+                DropdownMenuGroup(
+                    shapes =
+                        MenuDefaults.groupShapes(
+                            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 6.dp, bottomEnd = 6.dp),
+                            inactiveShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 6.dp, bottomEnd = 6.dp),
+                        )
+                ) {
                     ModuleFilter.entries.forEachIndexed { index, option ->
                         DropdownMenuItem(
                             selected = option == filter,
@@ -633,22 +644,28 @@ private fun ModuleFilterButton(
                             },
                             text = { Text(stringResource(option.labelRes())) },
                             shapes = MenuDefaults.itemShape(index, ModuleFilter.entries.size),
-                            // The KSU-style state mark: a check in the trailing slot when this is
-                            // the active filter, nothing otherwise. The selectable colors already
-                            // tint the selected item; the check makes the choice explicit.
-                            trailingContent = {
-                                if (option == filter) {
-                                    Icon(
-                                        MaterialSymbols.Outlined.Check,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
+                            contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
+                            // The KSU-style selection mark: the selected item's leading slot shows a
+                            // check in the content (text) colour, standing in for the item's glyph.
+                            leadingIcon = null,
+                            selectedLeadingIcon = {
+                                Icon(
+                                    MaterialSymbols.Outlined.Check,
+                                    contentDescription = null,
+                                    tint = LocalContentColor.current,
+                                )
                             },
                         )
                     }
                 }
-                DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
+                Spacer(Modifier.height(MenuDefaults.GroupSpacing))
+                DropdownMenuGroup(
+                    shapes =
+                        MenuDefaults.groupShapes(
+                            shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
+                            inactiveShape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp, bottomStart = 16.dp, bottomEnd = 16.dp),
+                        )
+                ) {
                     ModuleSort.entries.forEachIndexed { index, option ->
                         DropdownMenuItem(
                             selected = option == sort,
@@ -658,14 +675,14 @@ private fun ModuleFilterButton(
                             },
                             text = { Text(stringResource(option.labelRes())) },
                             shapes = MenuDefaults.itemShape(index, ModuleSort.entries.size),
-                            trailingContent = {
-                                if (option == sort) {
-                                    Icon(
-                                        MaterialSymbols.Outlined.Check,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
+                            contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
+                            leadingIcon = null,
+                            selectedLeadingIcon = {
+                                Icon(
+                                    MaterialSymbols.Outlined.Check,
+                                    contentDescription = null,
+                                    tint = LocalContentColor.current,
+                                )
                             },
                         )
                     }

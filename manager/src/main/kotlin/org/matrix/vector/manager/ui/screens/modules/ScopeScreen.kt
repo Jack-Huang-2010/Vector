@@ -27,29 +27,34 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Launch
-import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
-import androidx.compose.material.icons.automirrored.rounded.Sort
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Checklist
-import androidx.compose.material.icons.rounded.DoneAll
-import androidx.compose.material.icons.rounded.FilterList
-import androidx.compose.material.icons.rounded.RemoveDone
 import androidx.compose.material.icons.rounded.RestartAlt
-import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.SettingsBackupRestore
-import androidx.compose.material.icons.rounded.SwapVert
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.outlined.Auto_awesome
+import com.composables.icons.materialsymbols.outlined.Check
+import com.composables.icons.materialsymbols.outlined.Done_all
+import com.composables.icons.materialsymbols.outlined.Download
+import com.composables.icons.materialsymbols.outlined.Filter_list
+import com.composables.icons.materialsymbols.outlined.Playlist_add
+import com.composables.icons.materialsymbols.outlined.Remove_done
+import com.composables.icons.materialsymbols.outlined.Settings_backup_restore
+import com.composables.icons.materialsymbols.outlined.Swap_vert
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -57,16 +62,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -108,14 +112,10 @@ import org.matrix.vector.manager.ui.screens.modules.ScopeViewModel.Companion.SYS
 import org.matrix.vector.manager.ui.theme.LocalizedOverlay
 import org.matrix.vector.ui.AppIcon
 import org.matrix.vector.ui.CheckSwitch
-import org.matrix.vector.ui.ChoiceRow
 import org.matrix.vector.ui.SearchField
 import org.matrix.vector.ui.SharedAlertDialog
 import org.matrix.vector.ui.SharedSnackbarHost
-import org.matrix.vector.ui.SheetAction
-import org.matrix.vector.ui.SheetHeading
 import org.matrix.vector.ui.SnackbarTone
-import org.matrix.vector.ui.ToggleRow
 import org.matrix.vector.ui.contextClickable
 import org.matrix.vector.ui.show
 import org.matrix.vector.ui.theme.Mono
@@ -674,6 +674,7 @@ fun ScopeScreen(
  * every second row wraps and the menu reads as a paragraph. A sheet has the full width, and it can
  * carry the leading icons that tell an action from a setting.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ScopeSelectMenu(
     hasRecommended: Boolean,
@@ -686,75 +687,102 @@ private fun ScopeSelectMenu(
     onRestore: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
-    IconButton(onClick = { open = true }) {
-        Icon(
-            Icons.Rounded.Checklist,
-            contentDescription = stringResource(R.string.scope_select),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    if (open) {
-        ScopeSheet(
-            stringResource(R.string.scope_select),
-            Icons.Rounded.Checklist,
-            { open = false },
-        ) {
-            if (hasRecommended) {
-                SheetAction(
-                    title = stringResource(R.string.scope_use_recommended),
-                    icon = Icons.Rounded.AutoAwesome,
-                    onClick = {
-                        onUseRecommended()
-                        open = false
-                    },
-                )
+    // The menu must live in the same Box as the trigger so a DropdownMenuPopup anchors beside it.
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(
+                Icons.Rounded.Checklist,
+                contentDescription = stringResource(R.string.scope_select),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
+            LocalizedOverlay {
+                val capsule = RoundedCornerShape(16.dp)
+                DropdownMenuGroup(shapes = MenuDefaults.groupShapes(shape = capsule, inactiveShape = capsule)) {
+                    if (hasRecommended) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.scope_use_recommended)) },
+                            shapes = MenuDefaults.itemShapes(),
+                            selected = false,
+                            leadingIcon = {
+                                Icon(MaterialSymbols.Outlined.Auto_awesome, contentDescription = null)
+                            },
+                            onClick = {
+                                onUseRecommended()
+                                open = false
+                            },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.scope_select_visible)) },
+                        shapes = MenuDefaults.itemShapes(),
+                        selected = false,
+                        leadingIcon = {
+                            Icon(MaterialSymbols.Outlined.Done_all, contentDescription = null)
+                        },
+                        onClick = {
+                            onSelectAll()
+                            open = false
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.scope_clear_visible)) },
+                        shapes = MenuDefaults.itemShapes(),
+                        selected = false,
+                        leadingIcon = {
+                            Icon(MaterialSymbols.Outlined.Remove_done, contentDescription = null)
+                        },
+                        onClick = {
+                            onSelectNone()
+                            open = false
+                        },
+                    )
+                    // The one entry that changes the *future* of the scope rather than its present,
+                    // so it is a toggle drawn as a checkmark rather than an action row.
+                    DropdownMenuItem(
+                        selected = includeNewApps,
+                        text = { Text(stringResource(R.string.scope_include_new_apps)) },
+                        shapes = MenuDefaults.itemShapes(),
+                        leadingIcon = {
+                            Icon(MaterialSymbols.Outlined.Playlist_add, contentDescription = null)
+                        },
+                        selectedLeadingIcon = {
+                            Icon(
+                                MaterialSymbols.Outlined.Check,
+                                contentDescription = null,
+                                tint = LocalContentColor.current,
+                            )
+                        },
+                        contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
+                        onClick = { onIncludeNewApps(!includeNewApps) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.scope_backup)) },
+                        shapes = MenuDefaults.itemShapes(),
+                        selected = false,
+                        leadingIcon = {
+                            Icon(MaterialSymbols.Outlined.Download, contentDescription = null)
+                        },
+                        onClick = {
+                            onBackup()
+                            open = false
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.scope_restore)) },
+                        shapes = MenuDefaults.itemShapes(),
+                        selected = false,
+                        leadingIcon = {
+                            Icon(MaterialSymbols.Outlined.Settings_backup_restore, contentDescription = null)
+                        },
+                        onClick = {
+                            onRestore()
+                            open = false
+                        },
+                    )
+                }
             }
-            SheetAction(
-                title = stringResource(R.string.scope_select_visible),
-                icon = Icons.Rounded.DoneAll,
-                onClick = {
-                    onSelectAll()
-                    open = false
-                },
-            )
-            SheetAction(
-                title = stringResource(R.string.scope_clear_visible),
-                icon = Icons.Rounded.RemoveDone,
-                onClick = {
-                    onSelectNone()
-                    open = false
-                },
-            )
-            // The one entry in this sheet that changes the *future* of the scope rather than its
-            // present, so its label says exactly that and not something narrower.
-            ToggleRow(
-                title = stringResource(R.string.scope_include_new_apps),
-                subtitle = stringResource(R.string.scope_include_new_apps_summary),
-                icon = Icons.AutoMirrored.Rounded.PlaylistAdd,
-                checked = includeNewApps,
-                onCheckedChange = onIncludeNewApps,
-            )
-
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-
-            // This module's scope alone, separate from the whole-list backup on the module
-            // screen — useful when moving one module's configuration between devices.
-            SheetAction(
-                title = stringResource(R.string.scope_backup),
-                icon = Icons.Rounded.SaveAlt,
-                onClick = {
-                    onBackup()
-                    open = false
-                },
-            )
-            SheetAction(
-                title = stringResource(R.string.scope_restore),
-                icon = Icons.Rounded.SettingsBackupRestore,
-                onClick = {
-                    onRestore()
-                    open = false
-                },
-            )
         }
     }
 }
@@ -769,6 +797,7 @@ private fun ScopeSelectMenu(
  * Chips rather than rows: these are short, all of one kind, and several are on at once — which a
  * column of ticks states less clearly than a row of filled chips.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ScopeFilterMenu(
     showSystem: Boolean,
@@ -799,69 +828,104 @@ private fun ScopeFilterMenu(
     // Under a static scope the list is already exactly the module's own fixed set, so there is
     // nothing to filter. The control stays present but visibly dead, and says why when pressed —
     // removing it entirely would just raise the same question silently.
-    IconButton(onClick = { if (locked) onLockedClick() else open = true }) {
-        BadgedBox(badge = { if (filtering) Badge(modifier = Modifier.size(6.dp)) }) {
-            Icon(
-                Icons.Rounded.FilterList,
-                contentDescription = stringResource(R.string.modules_filter),
-                tint =
-                    when {
-                        locked -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                        filtering -> MaterialTheme.colorScheme.primary
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            )
+    Box {
+        IconButton(onClick = { if (locked) onLockedClick() else open = true }) {
+            BadgedBox(badge = { if (filtering) Badge(modifier = Modifier.size(6.dp)) }) {
+                Icon(
+                    MaterialSymbols.Outlined.Filter_list,
+                    contentDescription = stringResource(R.string.modules_filter),
+                    tint =
+                        when {
+                            locked -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            filtering -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                )
+            }
         }
-    }
-    if (open) {
-        ScopeSheet(
-            stringResource(R.string.modules_filter),
-            Icons.Rounded.FilterList,
-            { open = false },
-        ) {
-            if (hasRecommended) {
-                // The static-scope view, on request. Offered only when the module has actually
-                // asked for something — otherwise it would narrow the list to nothing.
-                ChoiceRow {
-                    FilterChip(
-                        selected = recommendedOnly,
-                        onClick = { onToggleRecommendedOnly() },
-                        label = { Text(stringResource(R.string.scope_recommended_only)) },
+        DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
+            LocalizedOverlay {
+                val capsule = RoundedCornerShape(16.dp)
+                DropdownMenuGroup(shapes = MenuDefaults.groupShapes(shape = capsule, inactiveShape = capsule)) {
+                    if (hasRecommended) {
+                        // The static-scope view, on request. Offered only when the module has
+                        // actually asked for something — otherwise it would narrow the list to
+                        // nothing.
+                        DropdownMenuItem(
+                            selected = recommendedOnly,
+                            text = { Text(stringResource(R.string.scope_recommended_only)) },
+                            shapes = MenuDefaults.itemShapes(),
+                            leadingIcon = null,
+                            selectedLeadingIcon = {
+                                Icon(
+                                    MaterialSymbols.Outlined.Check,
+                                    contentDescription = null,
+                                    tint = LocalContentColor.current,
+                                )
+                            },
+                            contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
+                            onClick = { onToggleRecommendedOnly() },
+                        )
+                    }
+                    // Off while the module's own request is what the list is answering. That
+                    // question has one answer — what it asked for, and what it has been given —
+                    // and these three can only subtract from it.
+                    DropdownMenuItem(
+                        selected = showSystem,
+                        enabled = !recommendedOnly,
+                        text = { Text(stringResource(R.string.scope_system_apps)) },
+                        shapes = MenuDefaults.itemShapes(),
+                        leadingIcon = null,
+                        selectedLeadingIcon = {
+                            Icon(
+                                MaterialSymbols.Outlined.Check,
+                                contentDescription = null,
+                                tint = LocalContentColor.current,
+                            )
+                        },
+                        contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
+                        onClick = { onToggleSystem() },
+                    )
+                    DropdownMenuItem(
+                        selected = showGames,
+                        enabled = !recommendedOnly,
+                        text = { Text(stringResource(R.string.scope_games)) },
+                        shapes = MenuDefaults.itemShapes(),
+                        leadingIcon = null,
+                        selectedLeadingIcon = {
+                            Icon(
+                                MaterialSymbols.Outlined.Check,
+                                contentDescription = null,
+                                tint = LocalContentColor.current,
+                            )
+                        },
+                        contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
+                        onClick = { onToggleGames() },
+                    )
+                    DropdownMenuItem(
+                        selected = showModules,
+                        enabled = !recommendedOnly,
+                        text = { Text(stringResource(R.string.scope_modules)) },
+                        shapes = MenuDefaults.itemShapes(),
+                        leadingIcon = null,
+                        selectedLeadingIcon = {
+                            Icon(
+                                MaterialSymbols.Outlined.Check,
+                                contentDescription = null,
+                                tint = LocalContentColor.current,
+                            )
+                        },
+                        contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
+                        onClick = { onToggleModules() },
                     )
                 }
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            }
-            // Off while the module's own request is what the list is answering. That question has
-            // one answer — what it asked for, and what it has been given — and these three can
-            // only subtract from it: Chrome is a system app, so a module asking for Chrome would
-            // show an empty list to anyone who had not also turned system apps on. Greyed rather
-            // than hidden, so the reader can see the settings are still there and why they are not
-            // in play.
-            ChoiceRow {
-                FilterChip(
-                    selected = showSystem,
-                    enabled = !recommendedOnly,
-                    onClick = { onToggleSystem() },
-                    label = { Text(stringResource(R.string.scope_system_apps)) },
-                )
-                FilterChip(
-                    selected = showGames,
-                    enabled = !recommendedOnly,
-                    onClick = { onToggleGames() },
-                    label = { Text(stringResource(R.string.scope_games)) },
-                )
-                FilterChip(
-                    selected = showModules,
-                    enabled = !recommendedOnly,
-                    onClick = { onToggleModules() },
-                    label = { Text(stringResource(R.string.scope_modules)) },
-                )
             }
         }
     }
 }
 
 /** What order it is in: every [ScopeSort], and a reverse toggle over whichever is chosen. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ScopeSortMenu(
     sort: ScopeSort,
@@ -870,56 +934,54 @@ private fun ScopeSortMenu(
     onReverse: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
-    IconButton(onClick = { open = true }) {
-        Icon(
-            Icons.AutoMirrored.Rounded.Sort,
-            contentDescription = stringResource(R.string.scope_sort),
-            tint =
-                if (sort != ScopeSort.Relevance || reversed) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    if (open) {
-        ScopeSheet(
-            stringResource(R.string.scope_sort),
-            Icons.AutoMirrored.Rounded.Sort,
-            { open = false },
-        ) {
-            ChoiceRow {
-                ScopeSort.entries.forEach { option ->
-                    FilterChip(
-                        selected = option == sort,
-                        onClick = { onSort(option) },
-                        label = { Text(stringResource(option.labelRes())) },
-                    )
-                }
-            }
-            HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            ToggleRow(
-                title = stringResource(R.string.scope_sort_reverse),
-                icon = Icons.Rounded.SwapVert,
-                checked = reversed,
-                onCheckedChange = { onReverse() },
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(
+                MaterialSymbols.Outlined.Swap_vert,
+                contentDescription = stringResource(R.string.scope_sort),
+                tint =
+                    if (sort != ScopeSort.Relevance || reversed) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    }
-}
-
-/** The shell all three of this screen's sheets share, so they cannot drift apart. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ScopeSheet(
-    title: String,
-    icon: ImageVector,
-    onDismiss: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        LocalizedOverlay {
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
-                SheetHeading(title, icon)
-                content()
+        DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
+            LocalizedOverlay {
+                val capsule = RoundedCornerShape(16.dp)
+                val total = ScopeSort.entries.size + 1
+                DropdownMenuGroup(shapes = MenuDefaults.groupShapes(shape = capsule, inactiveShape = capsule)) {
+                    ScopeSort.entries.forEachIndexed { index, option ->
+                        DropdownMenuItem(
+                            selected = option == sort,
+                            text = { Text(stringResource(option.labelRes())) },
+                            shapes = MenuDefaults.itemShape(index, total),
+                            leadingIcon = null,
+                            selectedLeadingIcon = {
+                                Icon(
+                                    MaterialSymbols.Outlined.Check,
+                                    contentDescription = null,
+                                    tint = LocalContentColor.current,
+                                )
+                            },
+                            contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
+                            onClick = { onSort(option) },
+                        )
+                    }
+                    DropdownMenuItem(
+                        selected = reversed,
+                        text = { Text(stringResource(R.string.scope_sort_reverse)) },
+                        shapes = MenuDefaults.itemShape(ScopeSort.entries.size, total),
+                        leadingIcon = null,
+                        selectedLeadingIcon = {
+                            Icon(
+                                MaterialSymbols.Outlined.Check,
+                                contentDescription = null,
+                                tint = LocalContentColor.current,
+                            )
+                        },
+                        contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
+                        onClick = { onReverse() },
+                    )
+                }
             }
         }
     }

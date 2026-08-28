@@ -4,11 +4,14 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
@@ -21,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Bolt
 import com.composables.icons.materialsymbols.outlined.Check
@@ -29,8 +33,8 @@ import com.composables.icons.materialsymbols.outlined.Info
 import com.composables.icons.materialsymbols.outlined.Notifications_off
 import com.composables.icons.materialsymbols.outlined.Open_in_new
 import com.composables.icons.materialsymbols.outlined.Restart_alt
-import com.composables.icons.materialsymbols.outlined.Stop
-import com.composables.icons.materialsymbols.outlined.Store
+import com.composables.icons.materialsymbols.outlined.Stop_circle
+import com.composables.icons.materialsymbols.outlined.Storefront
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.matrix.vector.manager.R
@@ -185,7 +189,7 @@ fun PackageActionMenuItems(
                 add(
                     MenuAction(
                         label = { Text(stringResource(R.string.action_force_stop)) },
-                        leadingIcon = { Icon(MaterialSymbols.Outlined.Stop, contentDescription = null) },
+                        leadingIcon = { Icon(MaterialSymbols.Outlined.Stop_circle, contentDescription = null) },
                         onClick = {
                             finish {
                                 val result =
@@ -254,26 +258,31 @@ fun PackageActionMenuItems(
 
     DropdownMenuPopup(expanded = expanded, onDismissRequest = onDismiss) {
         LocalizedOverlay {
-            DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
+            // A single capsule group. The default M3 Expressive group corner (CornerExtraSmall) is
+            // far too square; WeKit's menu reads as a large-radius rounded group, so set both the
+            // group container and its items to a clearly rounded shape.
+            val capsule = RoundedCornerShape(16.dp)
+            DropdownMenuGroup(shapes = MenuDefaults.groupShapes(shape = capsule, inactiveShape = capsule)) {
                 items.forEachIndexed { index, action ->
                     DropdownMenuItem(
                         selected = action.selected,
                         onClick = action.onClick,
                         text = action.label,
                         shapes = MenuDefaults.itemShape(index, items.size),
-                        leadingIcon = action.leadingIcon,
-                        // The KSU-style state mark: a check in the trailing slot when this item is
-                        // the active one, nothing otherwise. The selectable colors already tint the
-                        // selected item; the check makes the choice explicit.
-                        trailingContent = {
-                            if (action.selected) {
-                                Icon(
-                                    MaterialSymbols.Outlined.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
+                        // When selected, the leading icon is replaced by a check (KSU-style) rather
+                        // than keeping the glyph and adding a trailing mark. The check is tinted with
+                        // the same content colour as the label, so it reads as part of the item text.
+                        leadingIcon = if (action.selected) null else action.leadingIcon,
+                        selectedLeadingIcon = {
+                            Icon(
+                                MaterialSymbols.Outlined.Check,
+                                contentDescription = null,
+                                tint = LocalContentColor.current,
+                            )
                         },
+                        // Tighter than the M3 default so an un-checked item hugs its text instead of
+                        // left-aligning inside a wide empty canvas.
+                        contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
                     )
                 }
             }
@@ -422,7 +431,7 @@ fun ModuleActionMenuItems(
                 add(
                     MenuAction(
                         label = { Text(stringResource(R.string.action_open_store)) },
-                        leadingIcon = { Icon(MaterialSymbols.Outlined.Store, contentDescription = null) },
+                        leadingIcon = { Icon(MaterialSymbols.Outlined.Storefront, contentDescription = null) },
                         onClick = {
                             onDismiss()
                             onOpenStore(packageName)
@@ -478,7 +487,7 @@ fun ModuleActionMenuItems(
                 add(
                     MenuAction(
                         label = { Text(stringResource(R.string.action_force_stop)) },
-                        leadingIcon = { Icon(MaterialSymbols.Outlined.Stop, contentDescription = null) },
+                        leadingIcon = { Icon(MaterialSymbols.Outlined.Stop_circle, contentDescription = null) },
                         onClick = {
                             finish {
                                 val result =
@@ -537,23 +546,26 @@ fun ModuleActionMenuItems(
 
     DropdownMenuPopup(expanded = expanded, onDismissRequest = onDismiss) {
         LocalizedOverlay {
-            DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
+            // A single capsule group. The default M3 Expressive group corner (CornerExtraSmall) is
+            // far too square; WeKit's menu reads as a large-radius rounded group, so set both the
+            // group container and its items to a clearly rounded shape.
+            val capsule = RoundedCornerShape(16.dp)
+            DropdownMenuGroup(shapes = MenuDefaults.groupShapes(shape = capsule, inactiveShape = capsule)) {
                 items.forEachIndexed { index, action ->
                     DropdownMenuItem(
                         selected = action.selected,
                         onClick = action.onClick,
                         text = action.label,
                         shapes = MenuDefaults.itemShape(index, items.size),
-                        leadingIcon = action.leadingIcon,
-                        trailingContent = {
-                            if (action.selected) {
-                                Icon(
-                                    MaterialSymbols.Outlined.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
+                        leadingIcon = if (action.selected) null else action.leadingIcon,
+                        selectedLeadingIcon = {
+                            Icon(
+                                MaterialSymbols.Outlined.Check,
+                                contentDescription = null,
+                                tint = LocalContentColor.current,
+                            )
                         },
+                        contentPadding = PaddingValues(start = 4.dp, end = 10.dp),
                     )
                 }
             }
